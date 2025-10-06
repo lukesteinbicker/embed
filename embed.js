@@ -387,6 +387,25 @@
     endVideoCall();
   }
   
+  async function fetchUserInfoForMessage(messageBox) {
+    try {
+      // Get current visit info to find the user who claimed it
+      const response = await fetch(`${apiBase}/api/visitor/current-status?visitorId=${encodeURIComponent(visitorId)}&sessionId=${encodeURIComponent(sessionId)}`);
+      const statusData = await response.json();
+      
+      if (statusData && statusData.userId) {
+        // For now, use a generic message since we don't have user details readily available
+        // You can enhance this later by creating an API endpoint that returns user/company info
+        messageBox.innerHTML = 'Talk to our team about how we can fit your needs';
+      } else {
+        messageBox.innerHTML = 'Talk to our team about how we can fit your needs';
+      }
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+      messageBox.innerHTML = 'Talk to our team about how we can fit your needs';
+    }
+  }
+
   function initializeVideoCall(dailyRoomId) {
     const videoContainer = document.createElement('div');
     videoContainer.id = 'video-call-container';
@@ -437,24 +456,65 @@
       top: 10px;
       right: 10px;
       padding: 8px 16px;
-      background: #4ade80;
+      background: #374151;
       color: white;
-      border: none;
-      border-radius: 6px;
+      border: 1px solid #6b7280;
+      border-radius: 12px;
       cursor: pointer;
       font-size: 12px;
       font-weight: 600;
       z-index: 10001;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     `;
     
     joinButton.addEventListener('click', () => {
       joinVideoCall();
     });
     
+    // Add hover effects to match other buttons
+    joinButton.addEventListener('mouseenter', function() {
+      this.style.transform = 'scale(1.05)';
+      this.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.2)';
+    });
+    
+    joinButton.addEventListener('mouseleave', function() {
+      this.style.transform = 'scale(1)';
+      this.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+    });
+    
+    // Create personalized message box
+    const messageBox = document.createElement('div');
+    messageBox.style.cssText = `
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      padding: 8px 12px;
+      background: #374151;
+      color: white;
+      border: 1px solid #6b7280;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 500;
+      text-align: center;
+      line-height: 1.3;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    `;
+    
+    // Set the message content (we'll need to get user info from the API)
+    messageBox.innerHTML = 'Loading...';
+    
     videoContainer.appendChild(remoteVideo);
     videoContainer.appendChild(localVideo);
     videoContainer.appendChild(joinButton);
+    videoContainer.appendChild(messageBox);
     document.body.appendChild(videoContainer);
+    
+    // Fetch user and company info to personalize the message
+    fetchUserInfoForMessage(messageBox);
     
     callFrame = window.DailyIframe.createCallObject({
       audioSource: true,
