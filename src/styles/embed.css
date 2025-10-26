@@ -1,0 +1,21 @@
+/* Embed widget CSS variables - matching the main app's light theme */
+:root {
+  /* Light theme colors for embed */
+  --background: 202 7% 93%;
+  --foreground: 202 7% 7%;
+  --muted: 202 7% 88%;
+  --muted-foreground: 202 7% 17%;
+  --primary: 202 7% 83%;
+  --primary-foreground: 202 7% 7%;
+  --destructive: 4 75% 25%;
+  --destructive-foreground: 202 7% 7%;
+  --border: 202 7% 50%;
+  --ring: 202 7% 7%;
+  --radius: 0.5rem;
+}
+
+/* Spinner animation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
