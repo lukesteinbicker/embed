@@ -4,6 +4,6 @@ export const EMBED_CONFIG = {
   DOMAIN: 'demoservice.app',
   
   get API_BASE() {
-    return `http://demoservice.app`;
+    return `https://demoservice.app`;
   }
 };
