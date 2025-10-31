@@ -7,10 +7,29 @@
   --muted-foreground: 202 7% 17%;
   --primary: 202 7% 83%;
   --primary-foreground: 202 7% 7%;
+  --constructive: 103 100% 30%;
+  --constructive-foreground: 202 7% 93%;
   --destructive: 4 75% 25%;
   --destructive-foreground: 202 7% 7%;
   --border: 202 7% 50%;
   --ring: 202 7% 7%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  /* Dark theme colors for embed */
+  --background: 202 7% 7%;
+  --foreground: 202 7% 93%;
+  --muted: 202 7% 17%;
+  --muted-foreground: 202 7% 88%;
+  --primary: 202 7% 17%;
+  --primary-foreground: 202 7% 93%;
+  --constructive: 103 100% 30%;
+  --constructive-foreground: 202 7% 7%;
+  --destructive: 4 75% 60%;
+  --destructive-foreground: 202 7% 93%;
+  --border: 202 7% 25%;
+  --ring: 202 7% 93%;
   --radius: 0.5rem;
 }
 

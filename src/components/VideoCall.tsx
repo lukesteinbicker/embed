@@ -16,6 +16,7 @@ export function VideoCall({ currentFields, onJoined }: VideoCallProps) {
   const daily = useDaily();
   
   const isInCall = !!currentFields.dailyRoomId && !currentFields.sessionEndedAt;
+  const joined = !!currentFields.joined;
 
   useEffect(() => {
     if (isInCall && currentFields.dailyRoomId && daily) {
@@ -46,10 +47,18 @@ export function VideoCall({ currentFields, onJoined }: VideoCallProps) {
     }
   }, [currentFields.sessionEndedAt, daily]);
 
-  // Update mic state when joined status changes
+  // Update mic state when joined status changes and enable audio when joined
   useEffect(() => {
     setIsMicEnabled(currentFields.joined || false);
-  }, [currentFields.joined]);
+    if (currentFields.joined && daily) {
+      // When joined becomes true, enable local audio
+      try {
+        daily.setLocalAudio(true);
+      } catch (error) {
+        console.error('Failed to enable local audio:', error);
+      }
+    }
+  }, [currentFields.joined, daily]);
 
   const toggleMic = async () => {
     if (!daily) return;
@@ -112,6 +121,7 @@ export function VideoCall({ currentFields, onJoined }: VideoCallProps) {
         isMicEnabled={isMicEnabled}
         onToggleMic={toggleMic}
         onToggleVideo={toggleVideo}
+        joined={joined}
       />
     </div>
   );
@@ -122,12 +132,15 @@ interface VideoContainerProps {
   isMicEnabled: boolean;
   onToggleMic: () => void;
   onToggleVideo: () => void;
+  joined: boolean;
 }
 
-function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVideo }: VideoContainerProps) {
+function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVideo, joined }: VideoContainerProps) {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const [remoteCallerName, setRemoteCallerName] = useState<string | null>(null);
+  const [declined, setDeclined] = useState<boolean>((window as any).__embedDeclined || false);
   
   // Get the daily instance
   const daily = useDaily();
@@ -139,6 +152,9 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
     const handleParticipantJoined = (event: any) => {
       if (!event.participant.local) {
         // Remote participant (agent)
+        // Capture a human-friendly display name if provided
+        const name = event.participant.user_name || event.participant.userName || event.participant.name || null;
+        if (name) setRemoteCallerName(name);
         if (event.participant.videoTrack && remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = new MediaStream([event.participant.videoTrack]);
           remoteVideoRef.current.muted = true;
@@ -147,7 +163,10 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
         }
         if (event.participant.audioTrack && remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = new MediaStream([event.participant.audioTrack]);
-          remoteAudioRef.current.play().catch(() => {});
+          remoteAudioRef.current.muted = !joined;
+          if (joined) {
+            remoteAudioRef.current.play().catch(() => {});
+          }
         }
       } else {
         // Local participant (visitor)
@@ -157,6 +176,13 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
           localVideoRef.current.playsInline = true as any;
           localVideoRef.current.play().catch(() => {});
         }
+      }
+    };
+
+    const handleParticipantUpdated = (event: any) => {
+      if (!event.participant.local) {
+        const name = event.participant.user_name || event.participant.userName || event.participant.name || null;
+        if (name) setRemoteCallerName(name);
       }
     };
 
@@ -176,9 +202,12 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
         remoteVideoRef.current.play().catch(() => {});
       }
       if (!event.participant.local && event.track.kind === "audio" && remoteAudioRef.current) {
-        // Remote audio track
+        // Remote audio track - attach but keep muted until joined
         remoteAudioRef.current.srcObject = new MediaStream([event.track]);
-        remoteAudioRef.current.play().catch(() => {});
+        remoteAudioRef.current.muted = !joined;
+        if (joined) {
+          remoteAudioRef.current.play().catch(() => {});
+        }
       }
     };
 
@@ -201,16 +230,35 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
     daily.on('participant-joined', handleParticipantJoined);
     daily.on('track-started', handleTrackStarted);
     daily.on('track-stopped', handleTrackStopped);
+    daily.on('participant-updated', handleParticipantUpdated);
 
     // Cleanup
     return () => {
       daily.off('participant-joined', handleParticipantJoined);
       daily.off('track-started', handleTrackStarted);
       daily.off('track-stopped', handleTrackStopped);
+      daily.off('participant-updated', handleParticipantUpdated);
     };
-  }, [daily]);
+  }, [daily, joined]);
 
-  return (
+  // Listen for global decline event to hide the video frame
+  useEffect(() => {
+    const handler = () => setDeclined(true);
+    window.addEventListener('embed-declined', handler as any);
+    return () => window.removeEventListener('embed-declined', handler as any);
+  }, []);
+
+  // When joined status changes, (un)mute remote audio accordingly
+  useEffect(() => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = !joined;
+      if (joined) {
+        remoteAudioRef.current.play().catch(() => {});
+      }
+    }
+  }, [joined]);
+
+  return declined ? null : (
     <div
       style={{
         width: '300px',
@@ -236,6 +284,28 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
           objectFit: 'cover',
         }}
       />
+
+      {/* Caller name banner when not yet joined - bottom overlay bar */}
+      {!joined && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '8px',
+            right: '8px',
+            bottom: '12px',
+            background: 'hsl(var(--foreground) / 0.7)',
+            color: 'hsl(var(--background))',
+            borderRadius: '16px',
+            padding: '10px 14px',
+            fontSize: '14px',
+            fontWeight: 600,
+            zIndex: 10002
+          }}
+        >
+          <span style={{ fontWeight: 800 }}>{remoteCallerName || 'Someone'}</span>
+          <span style={{ fontWeight: 500, opacity: 0.9 }}> is calling you...</span>
+        </div>
+      )}
       
       {/* Remote audio */}
       <audio
@@ -265,13 +335,15 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
         />
       )}
       
-      {/* Video and Mic controls */}
-      <VideoControls 
-        isVideoEnabled={isVideoEnabled}
-        isMicEnabled={isMicEnabled}
-        onToggleMic={onToggleMic}
-        onToggleVideo={onToggleVideo}
-      />
+      {/* Video and Mic controls (only after join) */}
+      {joined && (
+        <VideoControls 
+          isVideoEnabled={isVideoEnabled}
+          isMicEnabled={isMicEnabled}
+          onToggleMic={onToggleMic}
+          onToggleVideo={onToggleVideo}
+        />
+      )}
     </div>
   );
 }

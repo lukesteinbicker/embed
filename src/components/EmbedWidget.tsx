@@ -16,9 +16,9 @@ export function EmbedWidget() {
   const handleCallClick = () => {
     const inCall = !!currentFields.dailyRoomId;
     console.log('Call button clicked - inCall:', inCall, 'joined:', currentFields.joined);
-    if (!inCall && !currentFields.joined) {
-      console.log('Setting joined to true and active to true');
-      updateVisitFields({ joined: true, active: true, dailyRoomId: null });
+    if (!currentFields.joined) {
+      console.log('Setting joined to true');
+      updateVisitFields({ joined: true });
     }
   };
 
@@ -115,6 +115,7 @@ export function EmbedWidget() {
           currentFields={currentFields}
           onCallClick={handleCallClick}
           onCancelClick={handleCancelClick}
+          onCloseClick={handleCloseClick}
         />
       </DailyProvider>
     </div>

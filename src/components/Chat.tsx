@@ -13,6 +13,7 @@ import {
   usePresenceListener,
   useRoom
 } from '@ably/chat/react';
+import { PhoneOff, Phone, LogOut, Video, X } from 'lucide-react';
 
 interface ChatProps {
   chatRoomId: string | null;
@@ -43,8 +44,91 @@ function PresenceStatus() {
   return null; // Hidden but still manages presence
 }
 
+// Avatar component with error handling
+function Avatar({ userName, userImage }) {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  
+  // Reset error state when image URL changes
+  useEffect(() => {
+    if (userImage) {
+      setImageError(false);
+      setImageLoaded(false);
+    }
+  }, [userImage]);
+  
+  // Only show image if it exists, is not empty, and hasn't errored
+  const shouldShowImage = userImage && userImage.trim() && !imageError;
+  
+  return (
+    <div style={{
+      width: '32px',
+      height: '32px',
+      borderRadius: '50%',
+      overflow: 'hidden',
+      flexShrink: 0,
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      backgroundColor: 'hsl(var(--muted))',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative'
+    }}>
+      {shouldShowImage ? (
+        <>
+          {!imageLoaded && (
+            <div style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'hsl(var(--muted-foreground))',
+              backgroundColor: 'hsl(var(--muted))'
+            }}>
+              {userName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <img 
+            src={userImage} 
+            alt={userName}
+            onLoad={() => setImageLoaded(true)}
+            onError={() => {
+              setImageError(true);
+              setImageLoaded(false);
+            }}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: imageLoaded ? 'block' : 'none'
+            }}
+          />
+        </>
+      ) : (
+        <div style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '12px',
+          fontWeight: 600,
+          color: 'hsl(var(--muted-foreground))',
+          backgroundColor: 'hsl(var(--muted))'
+        }}>
+          {userName.charAt(0).toUpperCase()}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Messages component - following Ably guide exactly
-function MessagesList({ currentFields }) {
+function MessagesList({ currentFields, headerHeight = 0 }) {
   const [messages, setMessages] = useState([]);
   const messagesEndRef = useRef(null);
   
@@ -97,44 +181,70 @@ function MessagesList({ currentFields }) {
       flex: 1,
       overflowY: 'auto',
       padding: '12px',
+      paddingTop: headerHeight > 0 ? `${12 + headerHeight}px` : '12px',
       display: 'flex',
       flexDirection: 'column',
       gap: '8px',
       minHeight: 0 // Important for flex overflow
     }}>
-      {/* Header text */}
-      <div style={{
-        textAlign: 'center',
-        color: 'hsl(var(--foreground))',
-        fontSize: '13px',
-        padding: '8px 0',
-        fontWeight: '500'
-      }}>
-        <>Talk to a <span style={{ textDecoration: 'underline' }}>real person</span> in seconds</>
-      </div>
       
       {/* Show actual messages */}
       {messages && messages.length > 0 && (
-        messages.map((message) => (
-          <div key={message.id} style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: message.clientId?.startsWith('embed-') ? 'flex-end' : 'flex-start'
-          }}>
-            <div style={{
-              backgroundColor: 'hsl(var(--background))',
-              color: 'hsl(var(--foreground))',
-              padding: '6px 12px',
-              borderRadius: '16px',
-              maxWidth: '80%',
-              wordWrap: 'break-word',
-              border: '1px solid hsl(var(--border) / 0.3)',
-              fontSize: '13px'
+        messages.map((message) => {
+          // Check if this is a system message (user joined/left)
+          // Ably Chat stores custom data in metadata, not extras
+          const isSystemMessage = message.metadata?.type === 'system' || message.metadata?.eventType === 'user_joined';
+          
+          if (isSystemMessage) {
+            const userName = message.metadata?.userName || 'Someone';
+            const userImage = message.metadata?.userImage;
+            
+            return (
+              <div key={message.id} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 0',
+                width: '100%'
+              }}>
+                <Avatar userName={userName} userImage={userImage} />
+                <div style={{
+                  backgroundColor: 'transparent',
+                  color: 'hsl(var(--foreground))',
+                  padding: '8px 12px',
+                  borderRadius: '16px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  flex: 1
+                }}>
+                  {message.text || `${userName} joined the chat`}
+                </div>
+              </div>
+            );
+          }
+          
+          // Regular message
+          return (
+            <div key={message.id} style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: message.clientId?.startsWith('embed-') ? 'flex-end' : 'flex-start'
             }}>
-              {message.text || message.data}
+              <div style={{
+                backgroundColor: 'hsl(var(--background))',
+                color: 'hsl(var(--foreground))',
+                padding: '6px 12px',
+                borderRadius: '16px',
+                maxWidth: '80%',
+                wordWrap: 'break-word',
+                border: '1px solid hsl(var(--border) / 0.3)',
+                fontSize: '13px'
+              }}>
+                {message.text || message.data}
+              </div>
             </div>
-          </div>
-        ))
+          );
+        })
       )}
       
       {/* Visit completed message at bottom */}
@@ -152,7 +262,7 @@ function MessagesList({ currentFields }) {
         padding: '8px 0',
         fontWeight: '500'
       }}>
-            Visit completed
+            Visit ended
           </div>
         </div>
       )}
@@ -163,7 +273,7 @@ function MessagesList({ currentFields }) {
 }
 
 // Message input component - following Ably guide exactly
-function MessageInput({ currentFields }) {
+function MessageInput({ currentFields, onCallClick, onCancelClick, onCloseClick }) {
   const [messageText, setMessageText] = useState('');
   const messages = useMessages();
   
@@ -195,53 +305,62 @@ function MessageInput({ currentFields }) {
     <div style={{
       padding: '12px',
       display: 'flex',
+      flexDirection: 'column',
       gap: '8px',
       backgroundColor: 'transparent',
       flexShrink: 0 // Prevent shrinking
     }}>
-      <textarea
-        value={messageText}
-        onChange={(e) => setMessageText(e.target.value)}
-        onKeyPress={handleKeyPress}
-        placeholder="Message..."
-        disabled={isVisitCompleted}
-        style={{
-          flex: 1,
-          padding: '6px 12px',
-          border: '1px solid hsl(var(--border) / 0.3)',
-          borderRadius: '16px',
-          resize: 'none',
-          fontSize: '13px',
-          fontFamily: 'inherit',
-          outline: 'none',
-          backgroundColor: isVisitCompleted ? 'hsl(var(--muted))' : 'hsl(var(--background))',
-          color: isVisitCompleted ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))',
-          cursor: isVisitCompleted ? 'not-allowed' : 'text'
-        }}
-        rows={1}
-      />
-      <button 
-        onClick={handleSendMessage}
-        disabled={isVisitCompleted}
-        style={{
-          padding: '6px 12px',
-          backgroundColor: isVisitCompleted ? 'hsl(var(--muted))' : 'hsl(var(--background))',
-          color: isVisitCompleted ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))',
-          border: '1px solid hsl(var(--border) / 0.3)',
-          borderRadius: '16px',
-          cursor: isVisitCompleted ? 'not-allowed' : 'pointer',
-          fontSize: '13px',
-          fontWeight: '500'
-        }}
-      >
-        →
-      </button>
+      {/* Button section - always visible, right above input */}
+      <CallButtonSection currentFields={currentFields} onCallClick={onCallClick} onCancelClick={onCancelClick} onCloseClick={onCloseClick} />
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center'
+      }}>
+        <textarea
+          value={messageText}
+          onChange={(e) => setMessageText(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="Message..."
+          disabled={isVisitCompleted}
+          style={{
+            flex: 1,
+            padding: '6px 12px',
+            border: '1px solid hsl(var(--border) / 0.3)',
+            borderRadius: '16px',
+            resize: 'none',
+            fontSize: '13px',
+            fontFamily: 'inherit',
+            outline: 'none',
+            backgroundColor: isVisitCompleted ? 'hsl(var(--muted))' : 'hsl(var(--background))',
+            color: isVisitCompleted ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))',
+            cursor: isVisitCompleted ? 'not-allowed' : 'text'
+          }}
+          rows={1}
+        />
+        <button 
+          onClick={handleSendMessage}
+          disabled={isVisitCompleted}
+          style={{
+            padding: '6px 12px',
+            backgroundColor: isVisitCompleted ? 'hsl(var(--muted))' : 'hsl(var(--background))',
+            color: isVisitCompleted ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))',
+            border: '1px solid hsl(var(--border) / 0.3)',
+            borderRadius: '16px',
+            cursor: isVisitCompleted ? 'not-allowed' : 'pointer',
+            fontSize: '13px',
+            fontWeight: '500'
+          }}
+        >
+          →
+        </button>
+      </div>
     </div>
   );
 }
 
-// Call button component with exact styling from old embed
-function CallButtonSection({ currentFields, onCallClick, onCancelClick }) {
+// Call button component with exact styling from reference image
+function CallButtonSection({ currentFields, onCallClick, onCancelClick, onCloseClick }) {
   const isEnded = !!currentFields.sessionEndedAt;
   const isInCall = !!currentFields.dailyRoomId && !isEnded;
   const hasJoined = !!currentFields.joined;
@@ -250,95 +369,145 @@ function CallButtonSection({ currentFields, onCallClick, onCancelClick }) {
     return null; // Hide when ended or in call
   }
 
-  return (
-    <div style={{
-      padding: '2px 8px',
-      backgroundColor: 'transparent',
-      display: 'flex',
-      justifyContent: 'flex-end',
-      alignItems: 'center',
-      gap: '8px',
-      flexShrink: 0 // Prevent shrinking
-    }}>
-      {!isInCall && hasJoined && (
+  // Show cancel button when calling (hasJoined but not in call yet)
+  if (hasJoined && !isInCall) {
+    return (
+      <div style={{
+        padding: '6px 8px',
+        backgroundColor: 'transparent',
+        borderRadius: '12px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '12px',
+        flexShrink: 0,
+      }}>
+        {/* End chat button */}
+        <button
+          onClick={onCloseClick}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '6px 10px',
+            borderRadius: '16px',
+            background: 'transparent',
+            color: 'hsl(var(--foreground))',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: '500',
+            transition: 'all 0.15s ease',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <LogOut size={13} />
+          <span>End chat</span>
+        </button>
+        
+        {/* Calling button with X */}
         <button
           onClick={onCancelClick}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '6px 10px',
+            borderRadius: '16px',
+            background: 'hsl(var(--constructive))',
+            color: 'hsl(var(--constructive-foreground))',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: '500',
+            transition: 'all 0.15s ease',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <div 
+            style={{
+              width: '10px',
+              height: '10px',
+              border: '2px solid hsl(var(--constructive-foreground) / 0.4)',
+              borderTop: '2px solid hsl(var(--constructive-foreground))',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+            }}
+          />
+          <span>Calling</span>
+          <X size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  // Normal state - show End chat and Start a call buttons
+  return (
+    <div style={{
+      padding: '6px 8px',
+      backgroundColor: 'transparent',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: '12px',
+      flexShrink: 0,
+    }}>
+      {/* End chat button */}
+      <button
+        onClick={onCloseClick}
         style={{
-          padding: '6px 8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '6px 10px',
           borderRadius: '16px',
-          background: 'hsl(var(--background))',
+          background: 'transparent',
           color: 'hsl(var(--foreground))',
-          border: '1px solid hsl(var(--border) / 0.3)',
           cursor: 'pointer',
           fontSize: '13px',
           fontWeight: '500',
-          transition: 'all 0.2s ease',
+          transition: 'all 0.15s ease',
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          width: '24px',
-          height: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          whiteSpace: 'nowrap'
         }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.05)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-        >
-          ×
-        </button>
-      )}
+      >
+        <LogOut size={13} />
+        <span>End chat</span>
+      </button>
       
+      {/* Start a call button */}
       <button
         onClick={onCallClick}
         style={{
-          padding: '6px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '6px 10px',
           borderRadius: '16px',
-          background: 'linear-gradient(135deg, hsl(var(--foreground) / 0.9), hsl(var(--foreground) / 0.7))',
-          color: 'hsl(var(--background))',
-          border: '1px solid hsl(var(--border) / 0.3)',
+          background: 'hsl(var(--constructive))',
+          color: 'hsl(var(--constructive-foreground))',
+          border: 'none',
           cursor: 'pointer',
           fontSize: '13px',
           fontWeight: '500',
-          transition: 'all 0.2s ease',
+          transition: 'all 0.15s ease',
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          textAlign: 'center',
-          minWidth: '80px',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.05)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
+          whiteSpace: 'nowrap'
         }}
       >
-        {hasJoined && !isInCall ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-            <div 
-              style={{
-                width: '12px',
-                height: '12px',
-                border: '2px solid hsl(var(--background) / 0.3)',
-                borderTop: '2px solid hsl(var(--background))',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-              }}
-            />
-            <span>Calling</span>
-          </div>
-        ) : (
-          'Call now'
-        )}
+        <Video size={13} />
+        <span>Start a call</span>
       </button>
     </div>
   );
 }
 
 // Chat room component that uses all the hooks - following Ably guide exactly
-function ChatRoom({ chatRoomId, currentFields, onCallClick, onCancelClick, isCollapsed, onToggleCollapse }) {
+function ChatRoom({ chatRoomId, currentFields, onCallClick, onCancelClick, onCloseClick, isCollapsed, onToggleCollapse }) {
   const isInCall = !!currentFields.dailyRoomId && !currentFields.sessionEndedAt;
+  const hasJoined = !!currentFields.joined;
+  const [declined, setDeclined] = useState<boolean>((window as any).__embedDeclined || false);
   
   return (
     <div style={{
@@ -350,22 +519,96 @@ function ChatRoom({ chatRoomId, currentFields, onCallClick, onCancelClick, isCol
       position: 'relative'
     }}>
       
+      {/* Accept/Decline header when in call but not joined and not declined */}
+      {isInCall && !hasJoined && !declined && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '14px',
+          padding: '12px 16px',
+          background: 'hsl(var(--background))',
+          opacity: 0.7,
+          borderBottom: '1px solid hsl(var(--border) / 0.3)',
+          zIndex: 20
+        }}>
+          {/* Accept button */}
+          <button
+            onClick={onCallClick}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '12px 18px',
+              borderRadius: '20px',
+              background: 'hsl(var(--constructive))',
+              color: 'hsl(var(--constructive-foreground))',
+              border: '1px solid hsl(var(--foreground) / 0.06)',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: 700,
+              boxShadow: '0 2px 8px hsl(var(--foreground) / 0.15)'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.02)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Phone className="w-4 h-4" />
+              Accept
+            </div>
+          </button>
+          {/* Decline button */}
+          <button
+            onClick={() => {
+              (window as any).__embedDeclined = true;
+              window.dispatchEvent(new CustomEvent('embed-declined'));
+              setDeclined(true);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '12px 18px',
+              borderRadius: '20px',
+              background: 'hsl(var(--background))',
+              color: 'hsl(var(--foreground))',
+              border: '1px solid hsl(var(--border) / 0.6)',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: 700
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.02)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <PhoneOff className="w-4 h-4" />
+              Decline
+            </div>
+          </button>
+        </div>
+      )}
+
       <PresenceStatus />
       
       {/* Collapsible content */}
       {!isCollapsed && (
         <>
-          <MessagesList currentFields={currentFields} />
-          <CallButtonSection currentFields={currentFields} onCallClick={onCallClick} onCancelClick={onCancelClick} />
+          <MessagesList currentFields={currentFields} headerHeight={isInCall && !hasJoined && !declined ? 56 : 0} />
         </>
       )}
+      
+      
       
       {/* Message input - always visible, clickable to expand when collapsed */}
       <div 
         onClick={isCollapsed ? onToggleCollapse : undefined}
         style={{ cursor: isCollapsed ? 'pointer' : 'default' }}
       >
-        <MessageInput currentFields={currentFields} />
+        <MessageInput currentFields={currentFields} onCallClick={onCallClick} onCancelClick={onCancelClick} onCloseClick={onCloseClick} />
       </div>
       
       <style>
@@ -381,21 +624,16 @@ function ChatRoom({ chatRoomId, currentFields, onCallClick, onCancelClick, isCol
 }
 
 // Main chat component with its own Ably providers - following Ably guide exactly
-export function Chat({ chatRoomId, visitorData, currentFields, onCallClick, onCancelClick }: ChatProps & {
+export function Chat({ chatRoomId, visitorData, currentFields, onCallClick, onCancelClick, onCloseClick }: ChatProps & {
   currentFields: any;
   onCallClick: () => void;
   onCancelClick: () => void;
+  onCloseClick: () => void;
 }) {
   const [ablyClients, setAblyClients] = useState(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-  // Auto-collapse when in call
-  useEffect(() => {
-    const isInCall = !!currentFields.dailyRoomId && !currentFields.sessionEndedAt;
-    if (isInCall) {
-      setIsCollapsed(true);
-    }
-  }, [currentFields.dailyRoomId, currentFields.sessionEndedAt]);
+  // Don't auto-collapse when call starts - keep chat visible
 
   useEffect(() => {
     if (!chatRoomId || !visitorData) return;
@@ -503,6 +741,7 @@ export function Chat({ chatRoomId, visitorData, currentFields, onCallClick, onCa
               currentFields={currentFields}
               onCallClick={onCallClick}
               onCancelClick={onCancelClick}
+              onCloseClick={onCloseClick}
               isCollapsed={isCollapsed}
               onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
             />
