@@ -303,7 +303,7 @@ function MessageInput({ currentFields, onCallClick, onCancelClick, onCloseClick 
 
   return (
     <div style={{
-      padding: '12px',
+      padding: '2px 12px 12px',
       display: 'flex',
       flexDirection: 'column',
       gap: '8px',
@@ -445,7 +445,7 @@ function CallButtonSection({ currentFields, onCallClick, onCancelClick, onCloseC
   // Normal state - show End chat and Start a call buttons
   return (
     <div style={{
-      padding: '6px 8px',
+      padding: '2px 8px 2px 8px',
       backgroundColor: 'transparent',
       display: 'flex',
       justifyContent: 'space-between',
@@ -532,7 +532,6 @@ function ChatRoom({ chatRoomId, currentFields, onCallClick, onCancelClick, onClo
           gap: '14px',
           padding: '12px 16px',
           background: 'hsl(var(--background))',
-          opacity: 0.7,
           borderBottom: '1px solid hsl(var(--border) / 0.3)',
           zIndex: 20
         }}>
