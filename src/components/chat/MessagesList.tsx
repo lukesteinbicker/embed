@@ -5,52 +5,61 @@ import { Avatar } from './Avatar';
 
 interface MessagesListProps {
   currentFields: any;
-  headerHeight?: number;
   visitorClientId?: string;
+  hasInviteHeader?: boolean;
 }
 
 const styles = {
-  container: (headerHeight: number) => ({
+  container: (hasInviteHeader: boolean) => ({
     flex: 1,
     overflowY: 'auto',
     padding: '12px',
-    paddingTop: headerHeight > 0 ? `${12 + headerHeight}px` : '12px',
+    paddingTop: hasInviteHeader ? '80px' : '12px', // 68px header + 12px padding = 80px
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
-    minHeight: 0
+    gap: '12px',
+    minHeight: 0,
+    maxHeight: '100%',
+    background: 'hsl(var(--background))',
+    boxSizing: 'border-box'
   }),
   systemMessageWrapper: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    justifyContent: 'center',
     padding: '8px 0',
-    width: '100%'
+    width: '100%',
   },
   systemMessageText: {
-    backgroundColor: 'transparent',
-    color: 'hsl(var(--foreground))',
-    padding: '8px 12px',
-    borderRadius: '16px',
-    fontSize: '13px',
+    color: 'hsl(var(--muted-foreground))',
+    fontSize: '12px',
     fontWeight: 500,
-    flex: 1
+    textAlign: 'center'
   },
   messageWrapper: (isVisitor: boolean) => ({
     display: 'flex',
     flexDirection: 'column',
-    alignItems: isVisitor ? 'flex-end' : 'flex-start'
+    alignItems: isVisitor ? 'flex-end' : 'flex-start',
+    width: '100%'
   }),
-  messageBubble: {
-    backgroundColor: 'hsl(var(--background))',
+  messageBubble: (isVisitor: boolean, isPartOfSequence: boolean) => ({
+    backgroundColor: isVisitor ? 'hsl(var(--primary) / 0.18)' : 'hsl(var(--muted))',
     color: 'hsl(var(--foreground))',
-    padding: '6px 12px',
-    borderRadius: '16px',
+    padding: '10px 12px',
+    borderRadius: isPartOfSequence 
+      ? '20px' // Fully rounded for messages in the middle of a sequence
+      : (isVisitor ? '20px 20px 4px 20px' : '20px 20px 20px 4px'), // Square corner only for last message
     maxWidth: '80%',
+    minWidth: 0,
     wordWrap: 'break-word',
-    border: '1px solid hsl(var(--border) / 0.3)',
-    fontSize: '13px'
-  },
+    overflowWrap: 'break-word',
+    wordBreak: 'normal',
+    border: '1px solid hsl(var(--border) / 0.2)',
+    fontSize: '13px',
+    lineHeight: 1.45,
+    flexShrink: 1,
+    flex: '0 1 auto'
+  }),
   typingContainer: {
     display: 'flex',
     alignItems: 'center',
@@ -60,7 +69,7 @@ const styles = {
   typingBubble: {
     backgroundColor: 'hsl(var(--muted) / 0.8)',
     color: 'hsl(var(--foreground))',
-    padding: '6px 16px',
+    padding: '6px 12px',
     borderRadius: '16px',
     display: 'flex',
     alignItems: 'center',
@@ -79,19 +88,6 @@ const styles = {
     animation: 'typingDots 1.2s ease-in-out infinite',
     animationDelay: `${delay}s`
   }),
-  completionWrapper: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    marginTop: '8px'
-  },
-  completionText: {
-    textAlign: 'center',
-    color: 'hsl(var(--foreground))',
-    fontSize: '13px',
-    padding: '8px 0',
-    fontWeight: 500
-  }
 } as const;
 
 const TYPING_KEYFRAMES = `
@@ -115,38 +111,11 @@ function TypingIndicator({ userName, userImage }) {
   );
 }
 
-export function MessagesList({ currentFields, headerHeight = 0, visitorClientId }: MessagesListProps) {
+export function MessagesList({ currentFields, visitorClientId, hasInviteHeader }: MessagesListProps) {
   const [messages, setMessages] = useState([]);
-  const [agentInfo, setAgentInfo] = useState(null);
   const messagesEndRef = useRef(null);
 
   const isVisitCompleted = !!currentFields.sessionEndedAt;
-
-  const applyAgentInfo = useCallback((message) => {
-    const metadata = message?.metadata;
-    if (metadata?.userName) {
-      setAgentInfo((prev) => {
-        if (!prev) {
-          return {
-            userName: metadata.userName,
-            userImage: metadata.userImage ?? null
-          };
-        }
-
-        if (
-          prev.userName !== metadata.userName ||
-          (metadata.userImage ?? null) !== prev.userImage
-        ) {
-          return {
-            userName: metadata.userName,
-            userImage: metadata.userImage ?? null
-          };
-        }
-
-        return prev;
-      });
-    }
-  }, []);
 
   const { currentlyTyping } = useTyping();
 
@@ -159,10 +128,23 @@ export function MessagesList({ currentFields, headerHeight = 0, visitorClientId 
       })
     : [];
 
+  // Get user info for typing clients from their most recent messages
+  const getTypingUserInfo = (clientId: string) => {
+    // Find the most recent message from this clientId
+    const userMessages = messages.filter(msg => msg.clientId === clientId);
+    if (userMessages.length > 0) {
+      const latestMessage = userMessages[userMessages.length - 1];
+      return {
+        userName: latestMessage.metadata?.userName ?? null,
+        userImage: latestMessage.metadata?.userImage ?? null
+      };
+    }
+    return { userName: null, userImage: null };
+  };
+
   const messagesHook = useMessages({
     listener: (messageEvent) => {
       const message = messageEvent.message;
-      applyAgentInfo(message);
       setMessages((prevMessages) => [...prevMessages, message]);
     }
   });
@@ -181,7 +163,6 @@ export function MessagesList({ currentFields, headerHeight = 0, visitorClientId 
         .then((history) => {
           if (history && history.items) {
             const orderedMessages = history.items.reverse();
-            orderedMessages.forEach(applyAgentInfo);
             setMessages(orderedMessages);
           }
         })
@@ -189,57 +170,85 @@ export function MessagesList({ currentFields, headerHeight = 0, visitorClientId 
           console.error('Error getting message history:', error);
         });
     }
-  }, [messagesHook.roomStatus, applyAgentInfo]);
+  }, [messagesHook.roomStatus]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, typingClients.length]);
 
   return (
-    <div style={styles.container(headerHeight)}>
+    <div style={styles.container(!!hasInviteHeader)}>
       {messages && messages.length > 0 && (
-        messages.map((message) => {
+        messages.map((message, index) => {
           const isSystemMessage =
-            message.metadata?.type === 'system' || message.metadata?.eventType === 'user_joined';
+            message.metadata?.type === 'system' || 
+            message.metadata?.eventType === 'joined' ||
+            message.metadata?.eventType === 'ended';
 
           if (isSystemMessage) {
-            const userName = message.metadata?.userName || 'Someone';
-            const userImage = message.metadata?.userImage;
-
             return (
               <div key={message.id} style={styles.systemMessageWrapper}>
-                <Avatar userName={userName} userImage={userImage} />
                 <div style={styles.systemMessageText}>
-                  {message.text || `${userName} joined the chat`}
+                  {message.text || 'System message'}
                 </div>
               </div>
             );
           }
 
           const isVisitor = message.clientId?.startsWith('embed-');
+          
+          // Check if this is the last message from this user before another user speaks
+          const nextMessage = messages[index + 1];
+          const isLastFromUser = !nextMessage || 
+            (nextMessage.clientId?.startsWith('embed-') !== isVisitor) ||
+            (nextMessage.metadata?.type === 'system' || nextMessage.metadata?.eventType === 'joined');
+          
+          // Only show avatar for non-visitor messages (agent messages) when it's the last from that user
+          const messageUserName = message.metadata?.userName ?? null;
+          const messageUserImage = message.metadata?.userImage ?? null;
+          // Show avatar if it's not a visitor message and it's the last from that user
+          // Include automated messages (userName: null) so they show default avatar
+          const shouldShowAvatar = !isVisitor && isLastFromUser;
 
           return (
             <div key={message.id} style={styles.messageWrapper(isVisitor)}>
-              <div style={styles.messageBubble}>
-                {message.text || message.data}
+              <div style={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: '8px',
+                flexDirection: isVisitor ? 'row-reverse' : 'row',
+                width: '100%',
+                maxWidth: '100%'
+              }}>
+                {shouldShowAvatar && (
+                  <Avatar 
+                    userName={messageUserName} 
+                    userImage={messageUserImage} 
+                  />
+                )}
+                {!shouldShowAvatar && !isVisitor && (
+                  <div style={{ width: '32px', flexShrink: 0 }} />
+                )}
+                <div style={styles.messageBubble(isVisitor, !isLastFromUser)}>
+                  {message.text || message.data}
+                </div>
               </div>
             </div>
           );
         })
       )}
 
-      {typingClients.length > 0 && !isVisitCompleted && (
-        <TypingIndicator
-          userName={agentInfo?.userName || 'Agent'}
-          userImage={agentInfo?.userImage || null}
-        />
-      )}
-
-      {isVisitCompleted && (
-        <div style={styles.completionWrapper}>
-          <div style={styles.completionText}>Visit ended</div>
-        </div>
-      )}
+      {typingClients.length > 0 && !isVisitCompleted && (() => {
+        // Get the first typing client's info (or use null if not found)
+        const typingClientId = typingClients[0];
+        const { userName, userImage } = getTypingUserInfo(typingClientId);
+        return (
+          <TypingIndicator
+            userName={userName}
+            userImage={userImage}
+          />
+        );
+      })()}
 
       <div ref={messagesEndRef} />
     </div>

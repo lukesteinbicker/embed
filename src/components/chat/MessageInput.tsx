@@ -12,12 +12,20 @@ interface MessageInputProps {
 
 const styles = {
   wrapper: {
-    padding: '4px 12px 12px',
+    padding: '0',
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
     backgroundColor: 'transparent',
     flexShrink: 0
+  },
+  card: {
+    borderTop: '1px solid hsl(var(--border) / 0.4)',
+    borderRadius: '24px',
+    backgroundColor: 'hsl(var(--background))',
+    padding: '10px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
   },
   inputRow: {
     display: 'flex',
@@ -26,23 +34,24 @@ const styles = {
   },
   textarea: (isDisabled: boolean) => ({
     flex: 1,
-    padding: '6px 12px',
+    padding: '12px 14px',
     border: '1px solid hsl(var(--border) / 0.3)',
-    borderRadius: '16px',
+    borderRadius: '24px',
     resize: 'none',
     fontSize: '13px',
     fontFamily: 'inherit',
     outline: 'none',
-    backgroundColor: isDisabled ? 'hsl(var(--muted))' : 'hsl(var(--background))',
+    backgroundColor: isDisabled ? 'hsl(var(--muted))' : 'hsl(var(--background) / 0.95)',
     color: isDisabled ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))',
     cursor: isDisabled ? 'not-allowed' : 'text'
   }),
   sendButton: (isDisabled: boolean) => ({
-    padding: '6px 12px',
-    backgroundColor: isDisabled ? 'hsl(var(--muted))' : 'hsl(var(--foreground))',
-    color: 'hsl(var(--background))',
+    width: '40px',
+    height: '40px',
+    backgroundColor: isDisabled ? 'hsl(var(--muted))' : 'hsl(var(--foreground) / 0.1)',
+    color: isDisabled ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))',
     border: '1px solid hsl(var(--border) / 0.3)',
-    borderRadius: '16px',
+    borderRadius: '9999px',
     cursor: isDisabled ? 'not-allowed' : 'pointer',
     fontSize: '13px',
     fontWeight: '500',
@@ -54,7 +63,7 @@ const styles = {
 
 const callStyles = {
   container: {
-    padding: '4px 0px 0',
+    padding: '0',
     backgroundColor: 'transparent',
     display: 'flex',
     justifyContent: 'space-between',
@@ -66,8 +75,7 @@ const callStyles = {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    padding: '6px 10px',
-    borderRadius: '16px',
+    padding: '10px 8px',
     background: 'transparent',
     color: 'hsl(var(--foreground))',
     cursor: 'pointer',
@@ -76,15 +84,15 @@ const callStyles = {
     transition: 'all 0.15s ease',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     whiteSpace: 'nowrap',
-    minHeight: '32px'
+    minHeight: '32px',
   },
   primaryButton: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '6px 12px',
-    borderRadius: '16px',
-    background: 'hsl(var(--constructive))',
+    padding: '10px 14px',
+    borderRadius: '9999px',
+    background: 'linear-gradient(to bottom, hsl(var(--constructive)), hsl(var(--constructive) / 0.85))',
     color: 'hsl(var(--constructive-foreground))',
     border: 'none',
     cursor: 'pointer',
@@ -93,7 +101,8 @@ const callStyles = {
     transition: 'all 0.15s ease',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     whiteSpace: 'nowrap',
-    minHeight: '32px'
+    minHeight: '32px',
+    boxShadow: '0 2px 4px hsl(var(--constructive) / 0.2)'
   },
   spinner: {
     width: '10px',
@@ -147,7 +156,7 @@ function CallButtonSection({ currentFields, onCallClick, onCancelClick, onCloseC
       </button>
       <button onClick={onCallClick} style={callStyles.primaryButton}>
         <Video size={13} />
-        <span>Start a call</span>
+        <span>Start a video call</span>
       </button>
     </div>
   );
@@ -214,30 +223,32 @@ export function MessageInput({ currentFields, onCallClick, onCancelClick, onClos
 
   return (
     <div style={styles.wrapper}>
-      <CallButtonSection
-        currentFields={currentFields}
-        onCallClick={onCallClick}
-        onCancelClick={onCancelClick}
-        onCloseClick={onCloseClick}
-      />
-      <div style={styles.inputRow}>
-        <textarea
-          value={messageText}
-          onChange={handleChange}
-          onKeyPress={handleKeyPress}
-          onBlur={handleBlur}
-          placeholder="Send a message..."
-          disabled={isVisitCompleted}
-          style={styles.textarea(isVisitCompleted)}
-          rows={1}
+      <div style={styles.card}>
+        <CallButtonSection
+          currentFields={currentFields}
+          onCallClick={onCallClick}
+          onCancelClick={onCancelClick}
+          onCloseClick={onCloseClick}
         />
-        <button
-          onClick={handleSendMessage}
-          disabled={isVisitCompleted}
-          style={styles.sendButton(isVisitCompleted)}
-        >
-          <Send size={13} />
-        </button>
+        <div style={styles.inputRow}>
+          <textarea
+            value={messageText}
+            onChange={handleChange}
+            onKeyPress={handleKeyPress}
+            onBlur={handleBlur}
+            placeholder="Send a message..."
+            disabled={isVisitCompleted}
+            style={styles.textarea(isVisitCompleted)}
+            rows={1}
+          />
+          <button
+            onClick={handleSendMessage}
+            disabled={isVisitCompleted}
+            style={styles.sendButton(isVisitCompleted)}
+          >
+            <Send size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );

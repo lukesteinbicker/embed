@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useEffect, useState } from 'react';
+import { UserRound } from "lucide-react";
 
 interface AvatarProps {
   userName: string;
@@ -18,6 +19,9 @@ export function Avatar({ userName, userImage }: AvatarProps) {
   }, [userImage]);
 
   const shouldShowImage = userImage && userImage.trim() && !imageError;
+  const hasUserName = userName && userName.trim();
+  // Show default avatar when there's no image and no username
+  const showDefaultAvatar = !shouldShowImage && !hasUserName;
 
   return (
     <div
@@ -27,7 +31,7 @@ export function Avatar({ userName, userImage }: AvatarProps) {
         borderRadius: '50%',
         overflow: 'hidden',
         flexShrink: 0,
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        boxShadow: '0 2px 4px hsl(var(--foreground) / 0.1)',
         backgroundColor: 'hsl(var(--muted))',
         display: 'flex',
         alignItems: 'center',
@@ -52,12 +56,12 @@ export function Avatar({ userName, userImage }: AvatarProps) {
                 backgroundColor: 'hsl(var(--muted))'
               }}
             >
-              {userName.charAt(0).toUpperCase()}
+              {hasUserName ? userName.charAt(0).toUpperCase() : null}
             </div>
           )}
           <img
             src={userImage as string}
-            alt={userName}
+            alt={userName || 'Avatar'}
             onLoad={() => setImageLoaded(true)}
             onError={() => {
               setImageError(true);
@@ -71,6 +75,8 @@ export function Avatar({ userName, userImage }: AvatarProps) {
             }}
           />
         </>
+      ) : showDefaultAvatar ? (
+        <UserRound className="w-4 h-4 text-foreground" />
       ) : (
         <div
           style={{
@@ -85,7 +91,7 @@ export function Avatar({ userName, userImage }: AvatarProps) {
             backgroundColor: 'hsl(var(--muted))'
           }}
         >
-          {userName.charAt(0).toUpperCase()}
+          {hasUserName ? userName.charAt(0).toUpperCase() : null}
         </div>
       )}
     </div>

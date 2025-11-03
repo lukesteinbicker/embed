@@ -1,11 +1,30 @@
+import { useState, useEffect } from 'react';
 import { VideoCall } from './VideoCall';
 import { Chat } from './Chat';
 import { useVisitorData } from '../hooks/useVisitorData';
 import { usePageVisibility } from '../hooks/usePageVisibility';
-import { DailyProvider } from '@daily-co/daily-react';
+import { DailyProvider, useDaily } from '@daily-co/daily-react';
+import { X } from 'lucide-react';
+
+// Component to access Daily instance and cleanup when visit ends
+function DailyCleanup({ sessionEndedAt }: { sessionEndedAt: string | null | undefined }) {
+  const daily = useDaily();
+  
+  useEffect(() => {
+    if (sessionEndedAt && daily) {
+      console.log('Visit ended, stopping camera/mic and leaving room');
+      daily.setLocalAudio(false);
+      daily.setLocalVideo(false);
+      daily.leave();
+    }
+  }, [sessionEndedAt, daily]);
+  
+  return null;
+}
 
 export function EmbedWidget() {
   const { visitorData, currentFields, isInitialized, updateVisitFields } = useVisitorData();
+  const [inviteInfo, setInviteInfo] = useState<{ showInvite: boolean; onAccept: () => void; onDecline: () => void } | null>(null);
 
   usePageVisibility({
     visitorData,
@@ -38,21 +57,29 @@ export function EmbedWidget() {
   const handleCloseClick = () => {
     if (!visitorData) return;
     
-    // End the visit by setting sessionEndedAt
-    updateVisitFields({ 
-      endedAt: new Date().toISOString(),
-      active: false 
-    });
-    
-    // Immediately hide the embed after completing the visit
+    // Immediately hide the embed
     const embedElement = document.querySelector('[id^="embed-widget-"]') as HTMLElement;
     if (embedElement) {
       embedElement.style.display = 'none';
     }
+    
+    // End the visit (cleanup will happen automatically via VideoCall useEffect)
+    updateVisitFields({ 
+      endedAt: new Date().toISOString(),
+      active: false 
+    });
   };
 
-  // Only hide if not initialized or no visitor data
-  if (!isInitialized || !visitorData) {
+  // Only hide if not initialized, no visitor data, or visit has ended
+  if (!isInitialized || !visitorData || currentFields.sessionEndedAt) {
+    // Keep DailyProvider mounted briefly when visit ends to allow cleanup
+    if (currentFields.sessionEndedAt) {
+      return (
+        <DailyProvider>
+          <DailyCleanup sessionEndedAt={currentFields.sessionEndedAt} />
+        </DailyProvider>
+      );
+    }
     return null;
   }
 
@@ -64,7 +91,8 @@ export function EmbedWidget() {
       flexDirection: 'column',
       gap: '8px',
       width: '100%',
-      position: 'relative'
+      position: 'relative',
+      alignItems: 'stretch'
     }}>
       {/* Close button - positioned at top-right corner of entire embed */}
       {showCloseButton && (
@@ -72,9 +100,9 @@ export function EmbedWidget() {
           onClick={handleCloseClick}
           style={{
             position: 'absolute',
-            top: '-12px',
-            right: '-12px',
-            zIndex: 1000,
+            top: '-4px',
+            right: '-4px',
+            zIndex: 100000,
             padding: '6px 8px',
             borderRadius: '50%',
             background: 'hsl(var(--background))',
@@ -85,12 +113,13 @@ export function EmbedWidget() {
             fontWeight: '500',
             transition: 'all 0.2s ease',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            width: '24px',
-            height: '24px',
+            width: '32px',
+            height: '32px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+            boxShadow: '0 2px 8px hsl(var(--foreground) / 0.15)',
+            pointerEvents: 'auto',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'scale(1.05)';
@@ -99,15 +128,18 @@ export function EmbedWidget() {
             e.currentTarget.style.transform = 'scale(1)';
           }}
         >
-          ×
+          <X size={20} />
         </button>
       )}
       
       <DailyProvider>
+        <DailyCleanup sessionEndedAt={currentFields.sessionEndedAt} />
         <VideoCall
           currentFields={currentFields}
           visitorData={visitorData}
           onJoined={handleJoined}
+          onAcceptCall={handleCallClick}
+          onInviteInfo={setInviteInfo}
         />
         <Chat
           chatRoomId={currentFields.chatRoomId}
@@ -116,6 +148,7 @@ export function EmbedWidget() {
           onCallClick={handleCallClick}
           onCancelClick={handleCancelClick}
           onCloseClick={handleCloseClick}
+          inviteInfo={inviteInfo}
         />
       </DailyProvider>
     </div>

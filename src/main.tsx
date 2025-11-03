@@ -25,6 +25,8 @@ style.textContent = `
     --muted-foreground: 202 7% 83%;
     --primary: 202 7% 17%;
     --primary-foreground: 202 7% 93%;
+    --constructive: 152 75% 35%;
+    --constructive-foreground: 202 7% 93%;
     --destructive: 4 75% 25%;
     --destructive-foreground: 202 7% 93%;
     --border: 202 7% 50%;
@@ -37,6 +39,8 @@ style.textContent = `
     --muted-foreground: 202 7% 17%;
     --primary: 202 7% 83%;
     --primary-foreground: 202 7% 7%;
+    --constructive: 152 75% 35%;
+    --constructive-foreground: 202 7% 93%;
     --destructive: 4 75% 25%;
     --destructive-foreground: 202 7% 7%;
     --border: 202 7% 50%;
@@ -51,20 +55,75 @@ style.textContent = `
     100% { transform: rotate(360deg); }
   }
 
-  /* Completely isolated styles for embed */
-  .${cssClass} {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 300px;
-    z-index: 10000;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  }
-
-  .${cssClass} * {
+  /* Aggressive CSS reset and isolation for all children */
+  .${cssClass} *,
+  .${cssClass} *::before,
+  .${cssClass} *::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    border: 0;
+    font-size: 100%;
+    font: inherit;
+    vertical-align: baseline;
+    line-height: inherit;
+    color: inherit;
+    text-decoration: none;
+    background: transparent;
+    list-style: none;
+    quotes: none;
+    outline: none;
+  }
+
+  /* Completely isolated styles for embed root */
+  .${cssClass} {
+    all: initial;
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    width: 300px !important;
+    max-height: 600px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    z-index: 10000 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    color: hsl(var(--foreground)) !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+  }
+
+  /* Reset form elements */
+  .${cssClass} input,
+  .${cssClass} textarea,
+  .${cssClass} select {
+    font-family: inherit !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+    color: inherit !important;
+    background: transparent;
+    border: none;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+  }
+  
+  /* Buttons - don't override color to allow explicit styling */
+  .${cssClass} button {
+    font-family: inherit !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+    background: transparent;
+    border: none;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
   }
 `;
 document.head.appendChild(style);
