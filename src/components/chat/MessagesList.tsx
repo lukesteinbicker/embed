@@ -14,7 +14,7 @@ const styles = {
     flex: 1,
     overflowY: 'auto',
     padding: '12px',
-    paddingTop: hasInviteHeader ? '80px' : '12px', // 68px header + 12px padding = 80px
+    paddingTop: hasInviteHeader ? '48px' : '12px',
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
@@ -36,6 +36,31 @@ const styles = {
     fontWeight: 500,
     textAlign: 'center'
   },
+  joinedMessageWrapper: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%'
+  },
+  joinedMessageContainer: {
+    backgroundColor: 'hsl(var(--muted))',
+    borderRadius: '20px',
+    padding: '12px 16px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '8px',
+    width: 'calc(80% + 40px)',
+    minWidth: 'fit-content'
+  },
+  joinedMessageText: {
+    color: 'hsl(var(--foreground))',
+    fontSize: '13px',
+    fontWeight: 600,
+    textAlign: 'center',
+    whiteSpace: 'nowrap'
+  },
   messageWrapper: (isVisitor: boolean) => ({
     display: 'flex',
     flexDirection: 'column',
@@ -43,7 +68,7 @@ const styles = {
     width: '100%'
   }),
   messageBubble: (isVisitor: boolean, isPartOfSequence: boolean) => ({
-    backgroundColor: isVisitor ? 'hsl(var(--primary) / 0.18)' : 'hsl(var(--muted))',
+    backgroundColor: isVisitor ? 'hsl(var(--muted-special))' : 'hsl(var(--muted))',
     color: 'hsl(var(--foreground))',
     padding: '10px 12px',
     borderRadius: isPartOfSequence 
@@ -54,7 +79,6 @@ const styles = {
     wordWrap: 'break-word',
     overflowWrap: 'break-word',
     wordBreak: 'normal',
-    border: '1px solid hsl(var(--border) / 0.2)',
     fontSize: '13px',
     lineHeight: 1.45,
     flexShrink: 1,
@@ -75,7 +99,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '8px',
-    border: '1px solid hsl(var(--border) / 0.2)',
     minHeight: '32px',
     minWidth: '68px'
   },
@@ -184,6 +207,20 @@ export function MessagesList({ currentFields, visitorClientId, hasInviteHeader }
             message.metadata?.type === 'system' || 
             message.metadata?.eventType === 'joined' ||
             message.metadata?.eventType === 'ended';
+
+          if (message.metadata?.eventType === 'joined') {
+            return (
+              <div key={message.id} style={styles.joinedMessageWrapper}>
+                <div style={styles.joinedMessageContainer}>
+                  <Avatar userName={message.metadata?.userName} userImage={message.metadata?.userImage} />
+                  <div style={styles.joinedMessageText}>
+                    {message.text}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
 
           if (isSystemMessage) {
             return (

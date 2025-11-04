@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { VideoCall } from './VideoCall';
 import { Chat } from './Chat';
 import { useVisitorData } from '../hooks/useVisitorData';
@@ -25,6 +25,7 @@ function DailyCleanup({ sessionEndedAt }: { sessionEndedAt: string | null | unde
 export function EmbedWidget() {
   const { visitorData, currentFields, isInitialized, updateVisitFields } = useVisitorData();
   const [inviteInfo, setInviteInfo] = useState<{ showInvite: boolean; onAccept: () => void; onDecline: () => void } | null>(null);
+  const [videoFrame, setVideoFrame] = useState<React.ReactNode>(null);
 
   usePageVisibility({
     visitorData,
@@ -107,7 +108,7 @@ export function EmbedWidget() {
             borderRadius: '50%',
             background: 'hsl(var(--background))',
             color: 'hsl(var(--foreground))',
-            border: '1px solid hsl(var(--border) / 0.3)',
+            border: 'none',
             cursor: 'pointer',
             fontSize: '13px',
             fontWeight: '500',
@@ -140,6 +141,7 @@ export function EmbedWidget() {
           onJoined={handleJoined}
           onAcceptCall={handleCallClick}
           onInviteInfo={setInviteInfo}
+          renderVideoFrame={setVideoFrame}
         />
         <Chat
           chatRoomId={currentFields.chatRoomId}
@@ -149,6 +151,7 @@ export function EmbedWidget() {
           onCancelClick={handleCancelClick}
           onCloseClick={handleCloseClick}
           inviteInfo={inviteInfo}
+          videoFrame={videoFrame}
         />
       </DailyProvider>
     </div>

@@ -4,7 +4,7 @@ import * as Ably from 'ably';
 import { ChatClient, LogLevel } from '@ably/chat';
 import { AblyProvider } from 'ably/react';
 import { ChatClientProvider, ChatRoomProvider } from '@ably/chat/react';
-import { Phone, X } from 'lucide-react';
+import { Phone, PhoneOff, X } from 'lucide-react';
 import { EMBED_CONFIG } from '../config';
 import { ChatRoom } from './chat/ChatRoom';
 
@@ -19,12 +19,13 @@ interface ChatProps {
 }
 
 // Main chat component with its own Ably providers - following Ably guide exactly
-export function Chat({ chatRoomId, visitorData, currentFields, onCallClick, onCancelClick, onCloseClick, inviteInfo }: ChatProps & {
+export function Chat({ chatRoomId, visitorData, currentFields, onCallClick, onCancelClick, onCloseClick, inviteInfo, videoFrame }: ChatProps & {
   currentFields: any;
   onCallClick: () => void;
   onCancelClick: () => void;
   onCloseClick: () => void;
   inviteInfo?: { showInvite: boolean; onAccept: () => void; onDecline: () => void } | null;
+  videoFrame?: React.ReactNode;
 }) {
   const [ablyClients, setAblyClients] = useState(null);
   
@@ -87,7 +88,6 @@ export function Chat({ chatRoomId, visitorData, currentFields, onCallClick, onCa
         flexShrink: 0,
         flexGrow: 0,
         backgroundColor: 'hsl(var(--background))',
-        border: '1px solid hsl(var(--border) / 0.4)',
         borderRadius: '24px',
         boxShadow: '0 24px 48px hsl(var(--foreground) / 0.12), 0 10px 20px hsl(var(--foreground) / 0.08)',
         display: 'flex',
@@ -117,13 +117,10 @@ export function Chat({ chatRoomId, visitorData, currentFields, onCallClick, onCa
   return (
     <div style={{
       width: '100%',
-      height: '360px',
       minHeight: '360px',
-      maxHeight: '360px',
       flexShrink: 0,
       flexGrow: 0,
       backgroundColor: 'hsl(var(--background))',
-      border: '1px solid hsl(var(--border) / 0.4)',
       borderRadius: '24px',
       boxShadow: '0 24px 48px hsl(var(--foreground) / 0.12), 0 10px 20px hsl(var(--foreground) / 0.08)',
       display: 'flex',
@@ -132,27 +129,36 @@ export function Chat({ chatRoomId, visitorData, currentFields, onCallClick, onCa
       overflow: 'hidden',
       position: 'relative'
     }}>
-      {/* Accept/Decline buttons overlay header - fixed height to prevent container height changes */}
+      {/* Video frame at top when present */}
+      {videoFrame && (
+        <div style={{
+          width: '100%',
+          flexShrink: 0,
+          borderTopLeftRadius: '24px',
+          borderTopRightRadius: '24px',
+          overflow: 'hidden'
+        }}>
+          {videoFrame}
+        </div>
+      )}
+      
+      {/* Accept/Decline buttons overlay - positioned below video, rounded corners extend up into video */}
       {inviteInfo?.showInvite && (
         <div
           style={{
             position: 'absolute',
-            top: 0,
+            top: '170px',
             left: 0,
             right: 0,
-            zIndex: 1000,
             display: 'flex',
             gap: '12px',
-            padding: '10px 10px',
             background: 'hsl(var(--background))',
-            borderBottom: '1px solid hsl(var(--border) / 0.4)',
-            borderRadius: '24px 24px 0 0',
-            alignItems: 'center',
-            height: '68px',
-            minHeight: '68px',
-            maxHeight: '68px',
+            alignItems: 'flex-start',
+            padding: '6px',
             boxSizing: 'border-box',
-            overflow: 'hidden',
+            borderTopLeftRadius: '24px',
+            borderTopRightRadius: '24px',
+            zIndex: 1000,
             pointerEvents: 'auto'
           }}
         >
@@ -164,8 +170,8 @@ export function Chat({ chatRoomId, visitorData, currentFields, onCallClick, onCa
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              padding: '10px 14px',
-              borderRadius: '14px',
+              padding: '14px 18px',
+              borderRadius: '18px',
               background: 'linear-gradient(to bottom, hsl(var(--constructive)), hsl(var(--constructive) / 0.85))',
               color: 'hsl(var(--constructive-foreground))',
               border: '1px solid hsl(var(--constructive-foreground) / 0.25)',
@@ -193,10 +199,10 @@ export function Chat({ chatRoomId, visitorData, currentFields, onCallClick, onCa
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              padding: '10px 14px',
-              borderRadius: '14px',
+              padding: '14px 18px',
+              borderRadius: '18px',
               background: 'hsl(var(--background))',
-              color: 'hsl(var(--destructive))',
+              color: 'hsl(var(--foreground))',
               border: '1px solid hsl(var(--border) / 0.6)',
               fontSize: '15px',
               fontWeight: 600,
@@ -210,27 +216,35 @@ export function Chat({ chatRoomId, visitorData, currentFields, onCallClick, onCa
               event.currentTarget.style.transform = 'scale(1)';
             }}
           >
-            <X size={16} />
+            <PhoneOff size={16} />
             <span>Decline</span>
           </button>
         </div>
       )}
       
-      {/* Following Ably guide exactly - providers around the room */}
-      <AblyProvider client={ablyClients.realtimeClient}>
-        <ChatClientProvider client={ablyClients.chatClient}>
-          <ChatRoomProvider name={chatRoomId}>
-            <ChatRoom 
-              currentFields={currentFields}
-              onCallClick={onCallClick}
-              onCancelClick={onCancelClick}
-              onCloseClick={onCloseClick}
-              visitorData={visitorData}
-              hasInviteHeader={!!inviteInfo?.showInvite}
-            />
-          </ChatRoomProvider>
-        </ChatClientProvider>
-      </AblyProvider>
+      {/* Chat room container - always 360px */}
+      <div style={{
+        width: '100%',
+        height: '360px',
+        flexShrink: 0,
+        flexGrow: 0
+      }}>
+        {/* Following Ably guide exactly - providers around the room */}
+        <AblyProvider client={ablyClients.realtimeClient}>
+          <ChatClientProvider client={ablyClients.chatClient}>
+            <ChatRoomProvider name={chatRoomId}>
+              <ChatRoom 
+                currentFields={currentFields}
+                onCallClick={onCallClick}
+                onCancelClick={onCancelClick}
+                onCloseClick={onCloseClick}
+                visitorData={visitorData}
+                hasInviteHeader={!!inviteInfo?.showInvite}
+              />
+            </ChatRoomProvider>
+          </ChatClientProvider>
+        </AblyProvider>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useDaily } from '@daily-co/daily-react';
 import { Mic, MicOff, Video, VideoOff, Phone, X } from 'lucide-react';
 import { VisitorFields, VisitorData } from '../types';
@@ -10,9 +10,10 @@ interface VideoCallProps {
   onJoined: () => void;
   onAcceptCall: () => void;
   onInviteInfo?: (info: { showInvite: boolean; onAccept: () => void; onDecline: () => void } | null) => void;
+  renderVideoFrame?: (videoFrame: React.ReactNode) => void;
 }
 
-export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo }: VideoCallProps) {
+export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo, renderVideoFrame }: VideoCallProps) {
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
   const [isMicEnabled, setIsMicEnabled] = useState(currentFields.joined || false);
   const [inviteDeclined, setInviteDeclined] = useState<boolean>((window as any).__embedDeclined || false);
@@ -25,11 +26,68 @@ export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo 
     if (isInCall && currentFields.dailyRoomId && daily) {
       const roomUrl = `https://n2o.daily.co/${currentFields.dailyRoomId}`;
       console.log('Visitor: Joining room:', roomUrl);
+      
+      // Set up track event listeners to sync UI state
+      const handleTrackStarted = (event: any) => {
+        if (event.participant.local) {
+          if (event.track.kind === "video") {
+            setIsVideoEnabled(true);
+          } else if (event.track.kind === "audio") {
+            setIsMicEnabled(true);
+          }
+        }
+      };
+
+      const handleTrackStopped = (event: any) => {
+        if (event.participant.local) {
+          if (event.track.kind === "video") {
+            setIsVideoEnabled(false);
+          } else if (event.track.kind === "audio") {
+            setIsMicEnabled(false);
+          }
+        }
+      };
+
+      const handleParticipantJoined = (event: any) => {
+        if (event.participant.local) {
+          // Sync state with actual track state when local participant joins
+          const localParticipant = event.participant;
+          setIsVideoEnabled(!!localParticipant.videoTrack);
+          setIsMicEnabled(!!localParticipant.audioTrack);
+        }
+      };
+
+      daily.on('track-started', handleTrackStarted);
+      daily.on('track-stopped', handleTrackStopped);
+      daily.on('participant-joined', handleParticipantJoined);
+
       daily.join({ 
         url: roomUrl,
         startVideoOff: true,
         startAudioOff: true
+      }).then(() => {
+        // After joining, sync state with actual track state (handles page refresh case)
+        try {
+          const participants = daily.participants();
+          const localParticipant = participants?.local;
+          if (localParticipant) {
+            setIsVideoEnabled(!!localParticipant.videoTrack);
+            setIsMicEnabled(!!localParticipant.audioTrack);
+          }
+        } catch (e) {
+          console.error('Error syncing track state after join:', e);
+        }
+      }).catch((error) => {
+        console.error('Visitor: Failed to join room:', error);
       });
+
+      return () => {
+        try {
+          daily.off('track-started', handleTrackStarted);
+          daily.off('track-stopped', handleTrackStopped);
+          daily.off('participant-joined', handleParticipantJoined);
+        } catch (_) {}
+      };
     } else if (!isInCall && daily) {
       daily.leave();
     }
@@ -176,11 +234,7 @@ export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo 
     }
   }, [showInvite, onInviteInfo]);
 
-  if (!isInCall || (inviteDeclined && !joined)) {
-    return null;
-  }
-
-  return (
+  const videoContainer = (!isInCall || (inviteDeclined && !joined)) ? null : (
     <VideoContainer 
       isVideoEnabled={isVideoEnabled}
       isMicEnabled={isMicEnabled}
@@ -190,8 +244,22 @@ export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo 
       showInvite={showInvite}
       onAccept={handleAccept}
       onDecline={handleDecline}
+      noBorderRadius={!!renderVideoFrame}
     />
   );
+
+  useEffect(() => {
+    if (renderVideoFrame) {
+      renderVideoFrame(videoContainer);
+    }
+  }, [videoContainer, renderVideoFrame]);
+
+  // If renderVideoFrame is provided, don't render here (will be rendered in Chat)
+  if (renderVideoFrame) {
+    return null;
+  }
+
+  return videoContainer;
 }
 
 interface VideoContainerProps {
@@ -203,9 +271,10 @@ interface VideoContainerProps {
   showInvite?: boolean;
   onAccept?: () => void;
   onDecline?: () => void;
+  noBorderRadius?: boolean;
 }
 
-function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVideo, joined, showInvite, onAccept, onDecline }: VideoContainerProps) {
+function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVideo, joined, showInvite, onAccept, onDecline, noBorderRadius }: VideoContainerProps) {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
@@ -343,10 +412,10 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
         minHeight: '192px',
         maxHeight: '192px',
         background: 'hsl(var(--muted))',
-        borderRadius: '24px',
-        border: '1px solid hsl(var(--border) / 0.4)',
+        borderRadius: noBorderRadius ? 0 : '24px',
+        border: noBorderRadius ? 'none' : '1px solid hsl(var(--border) / 0.4)',
         overflow: 'hidden',
-        boxShadow: '0 18px 36px hsl(var(--foreground) / 0.12), 0 6px 16px hsl(var(--foreground) / 0.08)',
+        boxShadow: noBorderRadius ? 'none' : '0 18px 36px hsl(var(--foreground) / 0.12), 0 6px 16px hsl(var(--foreground) / 0.08)',
         position: 'relative',
         flexShrink: 0,
         flexGrow: 0,
@@ -370,29 +439,24 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
           <div
             style={{
               position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'flex-end',
-              padding: '8px',
-              backgroundImage: 'linear-gradient(to top, hsl(var(--foreground) / 0.55), transparent)',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              padding: '12px 16px 32px',
+              background: "rgba(0, 0, 0, 0.7)",
+              borderTopLeftRadius: '24px',
+              borderTopRightRadius: '24px',
               color: 'hsl(var(--background))',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: 600,
-              zIndex: 10002
+              display: 'flex',
+              alignItems: 'center',
+              zIndex: 10002,
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)'
             }}
           >
-            <div
-              style={{
-                padding: '10px 8px',
-                background: 'hsl(var(--background) / 0.15)',
-                borderRadius: '9999px',
-                backdropFilter: 'blur(6px)',
-                WebkitBackdropFilter: 'blur(6px)',
-              }}
-            >
-              <span style={{ fontWeight: 800 }}>{remoteCallerName || 'Someone'}</span>
-              <span style={{ fontWeight: 500, opacity: 0.9 }}> is calling you...</span>
-            </div>
+            <span style={{ fontWeight: 700 }}>{remoteCallerName || 'Someone'} is calling you...</span>
           </div>
         )}
         

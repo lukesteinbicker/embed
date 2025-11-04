@@ -28,13 +28,13 @@ const styles = {
     gap: '8px'
   },
   inputRow: {
+    position: 'relative',
     display: 'flex',
-    gap: '8px',
     alignItems: 'center'
   },
   textarea: (isDisabled: boolean) => ({
-    flex: 1,
-    padding: '12px 14px',
+    width: '100%',
+    padding: '12px 48px 12px 14px',
     border: '1px solid hsl(var(--border) / 0.3)',
     borderRadius: '24px',
     resize: 'none',
@@ -45,19 +45,20 @@ const styles = {
     color: isDisabled ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))',
     cursor: isDisabled ? 'not-allowed' : 'text'
   }),
-  sendButton: (isDisabled: boolean) => ({
-    width: '40px',
-    height: '40px',
-    backgroundColor: isDisabled ? 'hsl(var(--muted))' : 'hsl(var(--foreground) / 0.1)',
-    color: isDisabled ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))',
-    border: '1px solid hsl(var(--border) / 0.3)',
-    borderRadius: '9999px',
+  sendButton: (isDisabled: boolean, isEmpty: boolean) => ({
+    position: 'absolute',
+    right: '8px',
+    width: '32px',
+    height: '32px',
+    backgroundColor: 'transparent',
+    color: isDisabled ? 'hsl(var(--muted-foreground))' : (isEmpty ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))'),
+    border: 'none',
+    borderRadius: '50%',
     cursor: isDisabled ? 'not-allowed' : 'pointer',
-    fontSize: '13px',
-    fontWeight: '500',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    padding: 0
   })
 } as const;
 
@@ -244,9 +245,9 @@ export function MessageInput({ currentFields, onCallClick, onCancelClick, onClos
           <button
             onClick={handleSendMessage}
             disabled={isVisitCompleted}
-            style={styles.sendButton(isVisitCompleted)}
+            style={styles.sendButton(isVisitCompleted, !messageText.trim())}
           >
-            <Send size={16} />
+            <Send size={14} />
           </button>
         </div>
       </div>

@@ -22,10 +22,11 @@ style.textContent = `
     --background: 202 7% 3%;
     --foreground: 202 7% 93%;
     --muted: 202 7% 12%;
+    --muted-special: 202 15% 15%;
     --muted-foreground: 202 7% 83%;
     --primary: 202 7% 17%;
     --primary-foreground: 202 7% 93%;
-    --constructive: 152 75% 35%;
+    --constructive: 116 54% 50%;
     --constructive-foreground: 202 7% 93%;
     --destructive: 4 75% 25%;
     --destructive-foreground: 202 7% 93%;
@@ -36,10 +37,11 @@ style.textContent = `
     --background: 202 7% 93%;
     --foreground: 202 7% 7%;
     --muted: 202 7% 88%;
+    --muted-special: 202 15% 85%;
     --muted-foreground: 202 7% 17%;
     --primary: 202 7% 83%;
     --primary-foreground: 202 7% 7%;
-    --constructive: 152 75% 35%;
+    --constructive: 116 54% 50%;
     --constructive-foreground: 202 7% 93%;
     --destructive: 4 75% 25%;
     --destructive-foreground: 202 7% 7%;
