@@ -12,6 +12,10 @@ interface ChatRoomProps {
     visitorId: string;
   } | null;
   hasInviteHeader?: boolean;
+  showChatInput?: boolean;
+  onChatOpen?: () => void;
+  isConnecting?: boolean;
+  hasOverlay?: boolean;
 }
 
 const styles = {
@@ -31,7 +35,11 @@ export function ChatRoom({
   onCancelClick,
   onCloseClick,
   visitorData,
-  hasInviteHeader
+  hasInviteHeader,
+  showChatInput = true,
+  onChatOpen,
+  isConnecting,
+  hasOverlay = false
 }: ChatRoomProps) {
   const visitorClientId = visitorData ? `embed-${visitorData.visitorId}` : undefined;
 
@@ -43,13 +51,19 @@ export function ChatRoom({
         currentFields={currentFields}
         visitorClientId={visitorClientId}
         hasInviteHeader={hasInviteHeader}
-      />
-      <MessageInput
-        currentFields={currentFields}
+        onChatOpen={onChatOpen}
         onCallClick={onCallClick}
-        onCancelClick={onCancelClick}
-        onCloseClick={onCloseClick}
+        hasOverlay={hasOverlay}
       />
+      {showChatInput && (
+        <MessageInput
+          currentFields={currentFields}
+          onCallClick={onCallClick}
+          onCancelClick={onCancelClick}
+          onCloseClick={onCloseClick}
+          isConnecting={isConnecting}
+        />
+      )}
     </div>
   );
 }

@@ -5,12 +5,16 @@ import { EMBED_CONFIG } from '../config';
 
 export function useVisitorData() {
   const [visitorData, setVisitorData] = useState<VisitorData | null>(null);
+  // Initialize with undefined isReused so components know we're still loading
   const [currentFields, setCurrentFields] = useState<VisitorFields>({
     active: false,
     joined: false,
     dailyRoomId: null,
     chatRoomId: null,
-    sessionEndedAt: null
+    sessionEndedAt: null,
+    isReused: undefined, // Start as undefined to indicate initialization in progress
+    claimedUserName: null,
+    claimedUserImage: null
   });
   const [isInitialized, setIsInitialized] = useState(false);
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
@@ -142,20 +146,27 @@ export function useVisitorData() {
         
         if (data.type === 'visit_update') {
           setCurrentFields(prevFields => {
-            const next = {
+            // Update user fields if provided in the event (e.g., when visit is claimed)
+            const user = data.user;
+            const updatedClaimedUserName = user && typeof user === 'object' && 'name' in user
+              ? (user.name || null)
+              : prevFields.claimedUserName;
+            const updatedClaimedUserImage = user && typeof user === 'object' && 'image' in user
+              ? (user.image || null)
+              : prevFields.claimedUserImage;
+            
+            return {
               active: 'active' in data ? !!data.active : prevFields.active,
-              joined: 'joined' in data ? !!data.joined : prevFields.joined,
+              joined: 'joined' in data ? (typeof data.joined === 'boolean' ? data.joined : prevFields.joined) : prevFields.joined,
               dailyRoomId: 'dailyRoomId' in data ? (data.dailyRoomId || null) : prevFields.dailyRoomId,
               chatRoomId: 'chatRoomId' in data ? (data.chatRoomId || null) : prevFields.chatRoomId,
               sessionEndedAt: 'sessionEndedAt' in data ? (data.sessionEndedAt || null) : prevFields.sessionEndedAt,
+              // isReused is set once during initialization and never changes
+              isReused: prevFields.isReused,
+              // User fields can be updated when visit is claimed
+              claimedUserName: updatedClaimedUserName,
+              claimedUserImage: updatedClaimedUserImage,
             };
-            
-            // If the session has ended, immediately tear down UI and reset state
-            if (next.sessionEndedAt) {
-              return next;
-            }
-            
-            return next;
           });
         }
       } catch (error) {
@@ -186,25 +197,30 @@ export function useVisitorData() {
         if (visitorDataResult) {
           // Use the visit data returned from initialization
           const visitData = visitorDataResult.visitData;
+          
           if (visitData) {
-            // Generate chat room ID if not provided by server
             const chatRoomId = visitData.chatRoomId || `chat-${visitorDataResult.visitorId}-${visitorDataResult.sessionId}`;
             setCurrentFields({
               active: !!visitData.active,
-              joined: !!visitData.joined,
+              joined: visitData.joined === true,
               dailyRoomId: visitData.dailyRoomId || null,
-              chatRoomId: chatRoomId,
+              chatRoomId,
               sessionEndedAt: visitData.sessionEndedAt || null,
+              isReused: visitData.isReused === true,
+              claimedUserName: visitData.user?.name || null,
+              claimedUserImage: visitData.user?.image || null
             });
           } else {
-            // If no visit data, set default fields with generated chat room ID
             const chatRoomId = `chat-${visitorDataResult.visitorId}-${visitorDataResult.sessionId}`;
             setCurrentFields({
               active: true,
               joined: false,
               dailyRoomId: null,
-              chatRoomId: chatRoomId,
+              chatRoomId,
               sessionEndedAt: null,
+              isReused: false,
+              claimedUserName: null,
+              claimedUserImage: null
             });
           }
           // Now call subscribeToEvents directly since we have the visitorData

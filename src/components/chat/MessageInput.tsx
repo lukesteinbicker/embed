@@ -8,6 +8,7 @@ interface MessageInputProps {
   onCallClick: () => void;
   onCancelClick: () => void;
   onCloseClick: () => void;
+  isConnecting?: boolean;
 }
 
 const styles = {
@@ -122,31 +123,15 @@ const SPIN_KEYFRAMES = `
 }
 `;
 
-function CallButtonSection({ currentFields, onCallClick, onCancelClick, onCloseClick }) {
+function CallButtonSection({ currentFields, onCallClick, onCancelClick, onCloseClick, isConnecting: propIsConnecting }) {
   const isEnded = !!currentFields.sessionEndedAt;
   const isInCall = !!currentFields.dailyRoomId && !isEnded;
   const hasJoined = !!currentFields.joined;
+  const isConnecting = propIsConnecting || (hasJoined && !isInCall); // Use prop or fallback to calculated value
 
-  if (isEnded || isInCall) {
+  if (isEnded || isInCall || isConnecting) {
+    // Hide when ended, in call, or connecting (video frame is showing)
     return null;
-  }
-
-  if (hasJoined && !isInCall) {
-    return (
-      <>
-        <div style={callStyles.container}>
-          <button onClick={onCloseClick} style={callStyles.ghostButton}>
-            <LogOut size={13} />
-            <span>End chat</span>
-          </button>
-          <button onClick={onCancelClick} style={callStyles.primaryButton}>
-            <div style={callStyles.spinner} />
-            <span>Calling</span>
-          </button>
-        </div>
-        <style>{SPIN_KEYFRAMES}</style>
-      </>
-    );
   }
 
   return (
@@ -163,7 +148,7 @@ function CallButtonSection({ currentFields, onCallClick, onCancelClick, onCloseC
   );
 }
 
-export function MessageInput({ currentFields, onCallClick, onCancelClick, onCloseClick }: MessageInputProps) {
+export function MessageInput({ currentFields, onCallClick, onCancelClick, onCloseClick, isConnecting }: MessageInputProps) {
   const [messageText, setMessageText] = useState('');
   const messages = useMessages();
   const { keystroke, stop } = useTyping();
@@ -230,6 +215,7 @@ export function MessageInput({ currentFields, onCallClick, onCancelClick, onClos
           onCallClick={onCallClick}
           onCancelClick={onCancelClick}
           onCloseClick={onCloseClick}
+          isConnecting={isConnecting}
         />
         <div style={styles.inputRow}>
           <textarea

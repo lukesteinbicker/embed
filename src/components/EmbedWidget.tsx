@@ -26,6 +26,8 @@ export function EmbedWidget() {
   const { visitorData, currentFields, isInitialized, updateVisitFields } = useVisitorData();
   const [inviteInfo, setInviteInfo] = useState<{ showInvite: boolean; onAccept: () => void; onDecline: () => void } | null>(null);
   const [videoFrame, setVideoFrame] = useState<React.ReactNode>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [videoControls, setVideoControls] = useState<{ isVideoEnabled: boolean; isMicEnabled: boolean; onToggleMic: () => void; onToggleVideo: () => void } | null>(null);
 
   usePageVisibility({
     visitorData,
@@ -38,13 +40,19 @@ export function EmbedWidget() {
     console.log('Call button clicked - inCall:', inCall, 'joined:', currentFields.joined);
     if (!currentFields.joined) {
       console.log('Setting joined to true');
+      setIsConnecting(true);
       updateVisitFields({ joined: true });
     }
   };
 
   const handleCancelClick = () => {
     const inCall = !!currentFields.dailyRoomId;
-    if (!inCall && currentFields.joined) {
+    if (isConnecting) {
+      setIsConnecting(false);
+      if (currentFields.joined) {
+        updateVisitFields({ joined: false });
+      }
+    } else if (!inCall && currentFields.joined) {
       updateVisitFields({ joined: false });
     }
   };
@@ -52,6 +60,22 @@ export function EmbedWidget() {
   const handleJoined = () => {
     if (currentFields.dailyRoomId && !currentFields.joined) {
       updateVisitFields({ joined: true });
+    }
+  };
+
+  // Reset connecting state when call actually starts (dailyRoomId is set)
+  useEffect(() => {
+    if (currentFields.dailyRoomId && isConnecting) {
+      setIsConnecting(false);
+    }
+  }, [currentFields.dailyRoomId, isConnecting]);
+
+  const handleEndCall = () => {
+    if (currentFields.dailyRoomId || currentFields.joined) {
+      updateVisitFields({ 
+        dailyRoomId: null,
+        joined: false 
+      });
     }
   };
 
@@ -65,10 +89,12 @@ export function EmbedWidget() {
     }
     
     // End the visit (cleanup will happen automatically via VideoCall useEffect)
-    updateVisitFields({ 
-      endedAt: new Date().toISOString(),
-      active: false 
-    });
+    if (!currentFields.sessionEndedAt) {
+      updateVisitFields({ 
+        endedAt: new Date().toISOString(),
+        active: false 
+      });
+    }
   };
 
   // Only hide if not initialized, no visitor data, or visit has ended
@@ -110,23 +136,12 @@ export function EmbedWidget() {
             color: 'hsl(var(--foreground))',
             border: 'none',
             cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: '500',
-            transition: 'all 0.2s ease',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             width: '32px',
             height: '32px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 2px 8px hsl(var(--foreground) / 0.15)',
             pointerEvents: 'auto',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.05)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
           }}
         >
           <X size={20} />
@@ -142,6 +157,10 @@ export function EmbedWidget() {
           onAcceptCall={handleCallClick}
           onInviteInfo={setInviteInfo}
           renderVideoFrame={setVideoFrame}
+          isConnecting={isConnecting}
+          onVideoControls={setVideoControls}
+          claimedUserName={currentFields.claimedUserName}
+          claimedUserImage={currentFields.claimedUserImage}
         />
         <Chat
           chatRoomId={currentFields.chatRoomId}
@@ -152,6 +171,9 @@ export function EmbedWidget() {
           onCloseClick={handleCloseClick}
           inviteInfo={inviteInfo}
           videoFrame={videoFrame}
+          isConnecting={isConnecting}
+          videoControls={videoControls}
+          onEndCall={handleEndCall}
         />
       </DailyProvider>
     </div>

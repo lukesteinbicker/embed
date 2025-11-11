@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useState, useRef } from 'react';
 import { useDaily } from '@daily-co/daily-react';
-import { Mic, MicOff, Video, VideoOff, Phone, X } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, Phone, X, UserRound } from 'lucide-react';
 import { VisitorFields, VisitorData } from '../types';
 
 interface VideoCallProps {
@@ -11,9 +11,13 @@ interface VideoCallProps {
   onAcceptCall: () => void;
   onInviteInfo?: (info: { showInvite: boolean; onAccept: () => void; onDecline: () => void } | null) => void;
   renderVideoFrame?: (videoFrame: React.ReactNode) => void;
+  isConnecting?: boolean;
+  onVideoControls?: (controls: { isVideoEnabled: boolean; isMicEnabled: boolean; onToggleMic: () => void; onToggleVideo: () => void } | null) => void;
+  claimedUserName?: string | null;
+  claimedUserImage?: string | null;
 }
 
-export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo, renderVideoFrame }: VideoCallProps) {
+export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo, renderVideoFrame, isConnecting, onVideoControls, claimedUserName, claimedUserImage }: VideoCallProps) {
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
   const [isMicEnabled, setIsMicEnabled] = useState(currentFields.joined || false);
   const [inviteDeclined, setInviteDeclined] = useState<boolean>((window as any).__embedDeclined || false);
@@ -21,13 +25,13 @@ export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo,
   
   const isInCall = !!currentFields.dailyRoomId && !currentFields.sessionEndedAt;
   const joined = !!currentFields.joined;
+  const showConnecting = isConnecting && !isInCall;
 
   useEffect(() => {
     if (isInCall && currentFields.dailyRoomId && daily) {
       const roomUrl = `https://n2o.daily.co/${currentFields.dailyRoomId}`;
-      console.log('Visitor: Joining room:', roomUrl);
       
-      // Set up track event listeners to sync UI state
+      // Set up track event listeners BEFORE joining to catch all events
       const handleTrackStarted = (event: any) => {
         if (event.participant.local) {
           if (event.track.kind === "video") {
@@ -57,28 +61,42 @@ export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo,
         }
       };
 
+      // Register listeners before joining
       daily.on('track-started', handleTrackStarted);
       daily.on('track-stopped', handleTrackStopped);
       daily.on('participant-joined', handleParticipantJoined);
 
-      daily.join({ 
-        url: roomUrl,
-        startVideoOff: true,
-        startAudioOff: true
-      }).then(() => {
-        // After joining, sync state with actual track state (handles page refresh case)
+      // Sync state immediately if already in call (page refresh)
+      const syncCurrentState = () => {
         try {
           const participants = daily.participants();
           const localParticipant = participants?.local;
           if (localParticipant) {
             setIsVideoEnabled(!!localParticipant.videoTrack);
             setIsMicEnabled(!!localParticipant.audioTrack);
+          } else {
+            // Reset to defaults when joining fresh
+            setIsVideoEnabled(false);
+            setIsMicEnabled(false);
           }
         } catch (e) {
-          console.error('Error syncing track state after join:', e);
+          setIsVideoEnabled(false);
+          setIsMicEnabled(false);
         }
+      };
+
+      // Join room
+      daily.join({ 
+        url: roomUrl,
+        startVideoOff: true,
+        startAudioOff: true
+      }).then(() => {
+        // Sync state after join completes
+        syncCurrentState();
       }).catch((error) => {
         console.error('Visitor: Failed to join room:', error);
+        setIsVideoEnabled(false);
+        setIsMicEnabled(false);
       });
 
       return () => {
@@ -89,7 +107,16 @@ export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo,
         } catch (_) {}
       };
     } else if (!isInCall && daily) {
-      daily.leave();
+      // Reset state when leaving call
+      setIsVideoEnabled(false);
+      setIsMicEnabled(false);
+      try {
+        daily.leave();
+      } catch (_) {}
+    } else if (!isInCall) {
+      // Reset state when not in call (even without daily instance)
+      setIsVideoEnabled(false);
+      setIsMicEnabled(false);
     }
   }, [isInCall, currentFields.dailyRoomId, daily]);
 
@@ -136,60 +163,67 @@ export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo,
     }
   }, [currentFields.sessionEndedAt, daily]);
 
-  // Update mic state when joined status changes and enable audio when joined
+  // Enable audio when joined status changes - but don't override track state
+  // The track events will update isMicEnabled, so we just enable the track
   useEffect(() => {
-    setIsMicEnabled(currentFields.joined || false);
-    if (currentFields.joined && daily) {
+    if (currentFields.joined && daily && isInCall) {
       // When joined becomes true, enable local audio
+      // Track events will update isMicEnabled state automatically
       try {
         daily.setLocalAudio(true);
       } catch (error) {
         console.error('Failed to enable local audio:', error);
       }
     }
-  }, [currentFields.joined, daily]);
+  }, [currentFields.joined, daily, isInCall]);
 
   const toggleMic = async () => {
-    if (!daily) return;
+    if (!daily || !isInCall) return;
     
     try {
-      if (!isMicEnabled) {
-        // Check microphone permission
+      const newMicState = !isMicEnabled;
+      
+      if (newMicState) {
+        // Check microphone permission before enabling
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach(track => track.stop()); // Stop the test stream
         
-        // Enable mic and set joined to true
+        // Enable mic - track-started event will update isMicEnabled
         daily.setLocalAudio(true);
-        setIsMicEnabled(true);
-        onJoined(); // This will set joined to true
+        
+        // If not yet joined, mark as joined
+        if (!currentFields.joined) {
+          onJoined();
+        }
       } else {
-        // Disable mic but don't change joined status
+        // Disable mic - track-stopped event will update isMicEnabled
         daily.setLocalAudio(false);
-        setIsMicEnabled(false);
       }
+      // Don't set state here - let track events handle it for accuracy
     } catch (error) {
       console.error('Microphone permission denied:', error);
+      // Don't update state on permission error
     }
   };
 
   const toggleVideo = async () => {
-    if (!daily) return;
+    if (!daily || !isInCall) return;
     
     try {
       const newVideoState = !isVideoEnabled;
       
       if (newVideoState) {
-        // Check camera permission
+        // Check camera permission before enabling
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         stream.getTracks().forEach(track => track.stop()); // Stop the test stream
-      } else {
-        // Clear local video when disabling - this will be handled by track-stopped event
       }
       
+      // Enable/disable video - track events will update isVideoEnabled state
       daily.setLocalVideo(newVideoState);
-      setIsVideoEnabled(newVideoState);
+      // Don't set state here - let track events handle it for accuracy
     } catch (error) {
       console.error('Camera permission denied:', error);
+      // Don't update state on permission error
     }
   };
 
@@ -234,7 +268,34 @@ export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo,
     }
   }, [showInvite, onInviteInfo]);
 
-  const videoContainer = (!isInCall || (inviteDeclined && !joined)) ? null : (
+  // Expose video controls only when in a call AND joined AND daily is available
+  useEffect(() => {
+    if (!onVideoControls) return;
+    const shouldShowControls = isInCall && joined && !!daily;
+    if (shouldShowControls) {
+      onVideoControls({
+        isVideoEnabled,
+        isMicEnabled,
+        onToggleMic: toggleMic,
+        onToggleVideo: toggleVideo
+      });
+    } else {
+      onVideoControls(null);
+    }
+  }, [isInCall, joined, isVideoEnabled, isMicEnabled, daily, toggleMic, toggleVideo, onVideoControls]);
+
+  // Show the video container when:
+  // - There is an active call (isInCall)
+  // - The user is connecting (showConnecting)
+  // - The invite banner is visible (showInvite)
+  const shouldShowVideoContainer = isInCall || showConnecting || showInvite;
+
+  // Use claimedUserName from prop first, then fallback to currentFields
+  // This ensures we always have the latest claimed user info
+  const displayClaimedUserName = claimedUserName || currentFields.claimedUserName || null;
+  const displayClaimedUserImage = claimedUserImage || currentFields.claimedUserImage || null;
+  
+  const videoContainer = shouldShowVideoContainer ? (
     <VideoContainer 
       isVideoEnabled={isVideoEnabled}
       isMicEnabled={isMicEnabled}
@@ -245,8 +306,12 @@ export function VideoCall({ currentFields, onJoined, onAcceptCall, onInviteInfo,
       onAccept={handleAccept}
       onDecline={handleDecline}
       noBorderRadius={!!renderVideoFrame}
+      // Never show connecting message while in a call
+      isConnecting={showConnecting}
+      claimedUserName={displayClaimedUserName}
+      claimedUserImage={displayClaimedUserImage}
     />
-  );
+  ) : null;
 
   useEffect(() => {
     if (renderVideoFrame) {
@@ -272,17 +337,48 @@ interface VideoContainerProps {
   onAccept?: () => void;
   onDecline?: () => void;
   noBorderRadius?: boolean;
+  isConnecting?: boolean;
+  claimedUserName?: string | null;
+  claimedUserImage?: string | null;
 }
 
-function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVideo, joined, showInvite, onAccept, onDecline, noBorderRadius }: VideoContainerProps) {
+function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVideo, joined, showInvite, onAccept, onDecline, noBorderRadius, isConnecting, claimedUserName, claimedUserImage }: VideoContainerProps) {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const [remoteCallerName, setRemoteCallerName] = useState<string | null>(null);
   const [declined, setDeclined] = useState<boolean>((window as any).__embedDeclined || false);
+  const [isAvatarImageReady, setIsAvatarImageReady] = useState(false);
   
   // Get the daily instance
   const daily = useDaily();
+
+  // Preload claimed user image before displaying to avoid broken avatar
+  useEffect(() => {
+    if (!claimedUserImage) {
+      setIsAvatarImageReady(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsAvatarImageReady(false);
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) {
+        setIsAvatarImageReady(true);
+      }
+    };
+    img.onerror = () => {
+      if (!cancelled) {
+        setIsAvatarImageReady(false);
+      }
+    };
+    img.src = claimedUserImage;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [claimedUserImage]);
 
   useEffect(() => {
     if (!daily) return;
@@ -404,6 +500,21 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
     }
   }, [joined]);
 
+  // Ensure local corner video attaches when video is enabled (covers race with track-started before element mounts)
+  useEffect(() => {
+    if (!daily || !isVideoEnabled || !localVideoRef.current) return;
+    try {
+      const localParticipant = daily.participants()?.local;
+      const track = localParticipant?.videoTrack as MediaStreamTrack | undefined;
+      if (track) {
+        localVideoRef.current.srcObject = new MediaStream([track]);
+        localVideoRef.current.muted = true;
+        (localVideoRef.current as any).playsInline = true;
+        localVideoRef.current.play().catch(() => {});
+      }
+    } catch (_) {}
+  }, [daily, isVideoEnabled]);
+ 
   return declined ? null : (
     <div
       style={{
@@ -411,7 +522,7 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
         height: '192px',
         minHeight: '192px',
         maxHeight: '192px',
-        background: 'hsl(var(--muted))',
+        background: 'linear-gradient(to bottom, hsl(var(--special)), hsl(var(--special) / 0.7))',
         borderRadius: noBorderRadius ? 0 : '24px',
         border: noBorderRadius ? 'none' : '1px solid hsl(var(--border) / 0.4)',
         overflow: 'hidden',
@@ -422,31 +533,124 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
         zIndex: 1
       }}
     >
-        {/* Remote video */}
-        <video
-          ref={remoteVideoRef}
-          autoPlay
-          muted
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-          }}
-        />
+        {/* Remote video - only show when not connecting */}
+        {!isConnecting && (
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            muted
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+        )}
+
+        {/* Connecting state - show text with avatar */}
+        {isConnecting && (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'hsl(var(--foreground))'
+            }}
+          >
+                <div className="pulse-wrapper">
+                  {/* Outward pulsing rings (do not scale the avatar) */}
+                  <div className="ring ring1" />
+                  <div className="ring ring2" />
+                  <div style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                    boxShadow: '0 4px 12px hsl(var(--foreground) / 0.15)',
+                    backgroundColor: 'hsl(var(--muted))',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative'
+                  }}>
+                    {claimedUserImage && isAvatarImageReady ? (
+                      <img
+                        src={claimedUserImage}
+                        alt={claimedUserName || 'Avatar'}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '24px',
+                        fontWeight: 600,
+                        color: 'hsl(var(--muted-foreground))',
+                        backgroundColor: 'hsl(var(--muted))'
+                      }}>
+                        {claimedUserName ? claimedUserName.charAt(0).toUpperCase() : <UserRound size={32} />}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: 500
+                }}>
+                  Connecting to {claimedUserName || 'an agent'}
+                </div>
+                <style>{`
+                  .pulse-wrapper {
+                    position: relative;
+                    width: 96px;
+                    height: 96px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  }
+                  .pulse-wrapper .ring {
+                    position: absolute;
+                    width: 64px;
+                    height: 64px;
+                    border-radius: 50%;
+                    border: 2px solid hsl(var(--foreground) / 0.25);
+                    animation: ringPulse 1.8s ease-out infinite;
+                  }
+                  .pulse-wrapper .ring2 { animation-delay: 0.9s; }
+                  @keyframes ringPulse {
+                    0% { transform: scale(1); opacity: 0.6; }
+                    70% { transform: scale(1.8); opacity: 0; }
+                    100% { opacity: 0; }
+                  }
+                `}</style>
+              </div>
+            )}
+
 
         {/* Caller name banner when not yet joined - bottom overlay bar */}
-        {!joined && !declined && (
+        {!joined && !declined && !isConnecting && (
           <div
             style={{
               position: 'absolute',
               bottom: 0,
               left: 0,
               right: 0,
-              padding: '12px 16px 32px',
-              background: "rgba(0, 0, 0, 0.7)",
+              padding: '12px 16px 36px 16px',
+              background: 'linear-gradient(to bottom, hsl(var(--background) / 0.5), hsl(var(--background)))',
               borderTopLeftRadius: '24px',
               borderTopRightRadius: '24px',
-              color: 'hsl(var(--background))',
+              color: 'hsl(var(--foreground))',
               fontSize: '13px',
               fontWeight: 600,
               display: 'flex',
@@ -488,92 +692,6 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
           />
         )}
         
-        {/* Video and Mic controls (only after join) */}
-        {joined && (
-          <VideoControls 
-            isVideoEnabled={isVideoEnabled}
-            isMicEnabled={isMicEnabled}
-            onToggleMic={onToggleMic}
-            onToggleVideo={onToggleVideo}
-          />
-        )}
-    </div>
-  );
-}
-
-interface VideoControlsProps {
-  isVideoEnabled: boolean;
-  isMicEnabled: boolean;
-  onToggleMic: () => void;
-  onToggleVideo: () => void;
-}
-
-function VideoControls({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVideo }: VideoControlsProps) {
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        bottom: '10px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex',
-        gap: '8px',
-        zIndex: 10
-      }}
-    >
-      {/* Mic button */}
-      <button
-        onClick={onToggleMic}
-        style={{
-          width: '40px',
-          height: '40px',
-          borderRadius: '50%',
-          border: '1px solid hsl(var(--border) / 0.3)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 0.2s ease',
-          backgroundColor: 'hsl(var(--background))',
-          color: isMicEnabled ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
-          opacity: isMicEnabled ? 1 : 0.6,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.1)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-        }}
-      >
-        {isMicEnabled ? <Mic size={16} /> : <MicOff size={16} />}
-      </button>
-
-      {/* Video button */}
-      <button
-        onClick={onToggleVideo}
-        style={{
-          width: '40px',
-          height: '40px',
-          borderRadius: '50%',
-          border: '1px solid hsl(var(--border) / 0.3)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 0.2s ease',
-          backgroundColor: 'hsl(var(--background))',
-          color: isVideoEnabled ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
-          opacity: isVideoEnabled ? 1 : 0.6,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.1)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-        }}
-      >
-        {isVideoEnabled ? <Video size={16} /> : <VideoOff size={16} />}
-      </button>
     </div>
   );
 }

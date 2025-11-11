@@ -3,9 +3,32 @@ import ReactDOM from 'react-dom/client'
 import { nanoid } from 'nanoid'
 import { EmbedWidget } from './components/EmbedWidget'
 
-// Detect theme from script tag attribute
-const currentScript = document.currentScript as HTMLScriptElement;
-const theme = currentScript?.getAttribute('data-theme') || 'light';
+// Detect theme from script tag attribute or URL query parameter
+// Extract token from script tags (same pattern as useVisitorData)
+const scripts = document.getElementsByTagName('script');
+let theme = 'light';
+
+for (let i = 0; i < scripts.length; i++) {
+  const script = scripts[i];
+  if (script.src && script.src.includes('embed.js')) {
+    const url = new URL(script.src);
+    const themeParam = url.searchParams.get('theme');
+    if (themeParam) {
+      theme = themeParam;
+      break;
+    }
+  }
+  // Also check data attribute
+  if (script.dataset.theme) {
+    theme = script.dataset.theme;
+    break;
+  }
+  // Also check regular attribute
+  if (script.getAttribute('theme')) {
+    theme = script.getAttribute('theme') || 'light';
+    break;
+  }
+}
 
 // Generate unique IDs to prevent any conflicts
 const uniqueId = nanoid();
@@ -23,6 +46,7 @@ style.textContent = `
     --foreground: 202 7% 93%;
     --muted: 202 7% 12%;
     --muted-special: 202 15% 15%;
+    --special: 25 95% 53%;
     --muted-foreground: 202 7% 83%;
     --primary: 202 7% 17%;
     --primary-foreground: 202 7% 93%;
@@ -38,6 +62,7 @@ style.textContent = `
     --foreground: 202 7% 7%;
     --muted: 202 7% 88%;
     --muted-special: 202 15% 85%;
+    --special: 25 95% 53%;
     --muted-foreground: 202 7% 17%;
     --primary: 202 7% 83%;
     --primary-foreground: 202 7% 7%;

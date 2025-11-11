@@ -4,6 +4,9 @@ export interface VisitorFields {
   dailyRoomId: string | null;
   chatRoomId: string | null;
   sessionEndedAt: string | null;
+  claimedUserName?: string | null;
+  claimedUserImage?: string | null;
+  isReused?: boolean;
 }
 
 export interface EmbedConfig {
@@ -35,4 +38,10 @@ export interface EventSourceMessage {
   sessionEndedAt?: string | null;
   sessionId?: string;
   message?: string;
+  // User info sent when visit is claimed
+  user?: {
+    id: string;
+    name: string | null;
+    image: string | null;
+  };
 }
