@@ -47,6 +47,7 @@ style.textContent = `
     --muted: 202 7% 12%;
     --muted-special: 202 15% 15%;
     --special: 25 95% 53%;
+    --special-l: 25 95% 43%;
     --muted-foreground: 202 7% 83%;
     --primary: 202 7% 17%;
     --primary-foreground: 202 7% 93%;
@@ -63,6 +64,7 @@ style.textContent = `
     --muted: 202 7% 88%;
     --muted-special: 202 15% 85%;
     --special: 25 95% 53%;
+    --special-l: 25 95% 43%;
     --muted-foreground: 202 7% 17%;
     --primary: 202 7% 83%;
     --primary-foreground: 202 7% 7%;

@@ -138,23 +138,7 @@ export function Chat({ chatRoomId, visitorData, currentFields, onCallClick, onCa
         flexDirection: 'column',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         overflow: 'hidden'
-      }}>
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '12px',
-          textAlign: 'center',
-          color: 'hsl(var(--muted-foreground))'
-        }}>
-          <div>
-            <p style={{ margin: 0, fontSize: '14px' }}>
-              {!chatRoomId || !visitorData ? 'Initializing...' : 'Connecting to chat...'}
-            </p>
-          </div>
-        </div>
-      </div>
+      }} />
     );
   }
 

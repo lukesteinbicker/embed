@@ -522,7 +522,7 @@ function VideoContainer({ isVideoEnabled, isMicEnabled, onToggleMic, onToggleVid
         height: '192px',
         minHeight: '192px',
         maxHeight: '192px',
-        background: 'linear-gradient(to bottom, hsl(var(--special)), hsl(var(--special) / 0.7))',
+        background: 'linear-gradient(to bottom, hsl(var(--special)), hsl(var(--special-l)))',
         borderRadius: noBorderRadius ? 0 : '24px',
         border: noBorderRadius ? 'none' : '1px solid hsl(var(--border) / 0.4)',
         overflow: 'hidden',
