@@ -455,10 +455,10 @@ export function MessagesList({ currentFields, visitorClientId, hasInviteHeader, 
                             borderRadius: '9999px',
                             border: 'none',
                             background: selectedButton === 'call'
-                              ? 'hsl(25 95% 53%)'
+                              ? 'hsl(var(--special))'
                               : selectedButton === 'chat'
-                              ? 'hsl(25 95% 53% / 0.5)'
-                              : 'hsl(25 95% 53%)',
+                              ? 'hsl(var(--special) / 0.5)'
+                              : 'hsl(var(--special))',
                             color: '#ffffff',
                             fontSize: '13px',
                             fontWeight: 600,

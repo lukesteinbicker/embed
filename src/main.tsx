@@ -2,30 +2,34 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { nanoid } from 'nanoid'
 import { EmbedWidget } from './components/EmbedWidget'
+import { generateThemeCSS, type Theme } from './themes'
 
 // Detect theme from script tag attribute or URL query parameter
 // Extract token from script tags (same pattern as useVisitorData)
 const scripts = document.getElementsByTagName('script');
-let theme = 'light';
+let theme: Theme = 'light';
+let embedScript: HTMLScriptElement | null = null;
 
 for (let i = 0; i < scripts.length; i++) {
   const script = scripts[i];
   if (script.src && script.src.includes('embed.js')) {
+    embedScript = script;
     const url = new URL(script.src);
     const themeParam = url.searchParams.get('theme');
-    if (themeParam) {
+    if (themeParam === 'dark' || themeParam === 'light') {
       theme = themeParam;
       break;
     }
   }
   // Also check data attribute
-  if (script.dataset.theme) {
-    theme = script.dataset.theme;
+  if (script.dataset.theme === 'dark' || script.dataset.theme === 'light') {
+    theme = script.dataset.theme as Theme;
     break;
   }
   // Also check regular attribute
-  if (script.getAttribute('theme')) {
-    theme = script.getAttribute('theme') || 'light';
+  const attrTheme = script.getAttribute('theme');
+  if (attrTheme === 'dark' || attrTheme === 'light') {
+    theme = attrTheme as Theme;
     break;
   }
 }
@@ -38,45 +42,7 @@ const cssClass = `embed-widget-${uniqueId}`;
 // Create completely isolated CSS with unique class names
 const style = document.createElement('style');
 style.textContent = `
-  /* Embed widget CSS variables - theme: ${theme} - ID: ${uniqueId} */
-  .${cssClass} {
-    ${theme === 'dark' ? `
-    /* Dark theme colors for embed */
-    --background: 202 7% 3%;
-    --foreground: 202 7% 93%;
-    --muted: 202 7% 12%;
-    --muted-special: 202 15% 15%;
-    --special: 25 95% 53%;
-    --special-l: 25 95% 43%;
-    --muted-foreground: 202 7% 83%;
-    --primary: 202 7% 17%;
-    --primary-foreground: 202 7% 93%;
-    --constructive: 116 54% 50%;
-    --constructive-foreground: 202 7% 93%;
-    --destructive: 4 75% 25%;
-    --destructive-foreground: 202 7% 93%;
-    --border: 202 7% 50%;
-    --ring: 202 7% 93%;
-    ` : `
-    /* Light theme colors for embed */
-    --background: 202 7% 93%;
-    --foreground: 202 7% 7%;
-    --muted: 202 7% 88%;
-    --muted-special: 202 15% 85%;
-    --special: 25 95% 53%;
-    --special-l: 25 95% 43%;
-    --muted-foreground: 202 7% 17%;
-    --primary: 202 7% 83%;
-    --primary-foreground: 202 7% 7%;
-    --constructive: 116 54% 50%;
-    --constructive-foreground: 202 7% 93%;
-    --destructive: 4 75% 25%;
-    --destructive-foreground: 202 7% 7%;
-    --border: 202 7% 50%;
-    --ring: 202 7% 7%;
-    `}
-    --radius: 0.5rem;
-  }
+  ${generateThemeCSS(theme, cssClass)}
 
   /* Spinner animation with unique name */
   @keyframes ${cssClass}-spin {
@@ -106,19 +72,14 @@ style.textContent = `
 
   /* Completely isolated styles for embed root */
   .${cssClass} {
-    all: initial;
-    position: fixed !important;
-    bottom: 20px !important;
-    right: 20px !important;
-    width: 300px !important;
-    max-height: 600px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    z-index: 10000 !important;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-    font-size: 14px !important;
-    line-height: 1.5 !important;
-    color: hsl(var(--foreground)) !important;
+    width: 300px;
+    max-height: 600px;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
@@ -157,13 +118,25 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+// Find container: use script's parent if it exists, otherwise fall back to body
+let containerElement: HTMLElement = document.body;
+if (embedScript && embedScript.parentElement) {
+  containerElement = embedScript.parentElement;
+}
+
+// Get parent classes to inherit positioning/styling
+const parentClasses = containerElement !== document.body && containerElement.className 
+  ? containerElement.className 
+  : '';
+
 // Create root element with unique ID
 let rootElement = document.getElementById(rootId);
 if (!rootElement) {
   rootElement = document.createElement('div');
   rootElement.id = rootId;
-  rootElement.className = cssClass;
-  document.body.appendChild(rootElement);
+  // Combine embed class with parent classes so positioning/styling is inherited
+  rootElement.className = parentClasses ? `${cssClass} ${parentClasses}` : cssClass;
+  containerElement.appendChild(rootElement);
 }
 
 // Render the embed widget

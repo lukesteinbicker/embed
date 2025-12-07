@@ -1,9 +1,9 @@
 // Centralized configuration for the embed
 export const EMBED_CONFIG = {
   // CHANGE THIS DOMAIN WHEN DEPLOYED WITH DIFFERENT DOMAIN
-  DOMAIN: 'demoservice.app',
+  DOMAIN: 'localhost:3000',
   
   get API_BASE() {
-    return `https://demoservice.app`;
+    return `http://localhost:3000`;
   }
 };
